@@ -6,17 +6,30 @@ import { UserPlus, Trash2, Loader2 } from 'lucide-react'
 export default function AdminUsersPage() {
   const supabase = createClient()
   const [users, setUsers] = useState<any[]>([])
+  const [parents, setParents] = useState<any[]>([])
   const [filter, setFilter] = useState('all')
+  const [loadingParentId, setLoadingParentId] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
       let q = supabase.from('profiles').select('*').order('created_at', { ascending: false })
       if (filter !== 'all') q = q.eq('role', filter)
-      const { data } = await q
-      setUsers(data || [])
+      const [{ data: usersData }, { data: parentsData }] = await Promise.all([
+        q,
+        supabase.from('profiles').select('id, full_name').eq('role', 'parent')
+      ])
+      setUsers(usersData || [])
+      setParents(parentsData || [])
     }
     load()
   }, [filter])
+
+  const linkParent = async (studentId: string, parentId: string) => {
+    setLoadingParentId(studentId)
+    await supabase.from('profiles').update({ parent_id: parentId || null }).eq('id', studentId)
+    setUsers(prev => prev.map(u => u.id === studentId ? { ...u, parent_id: parentId || null } : u))
+    setLoadingParentId(null)
+  }
 
   const tabs = [
     { value: 'all', label: 'Барлығы' },
@@ -54,6 +67,7 @@ export default function AdminUsersPage() {
               <th className="text-left px-6 py-3 font-medium">Level</th>
               <th className="text-left px-6 py-3 font-medium">Creative Score</th>
               <th className="text-left px-6 py-3 font-medium">Тіркелген</th>
+              <th className="text-left px-6 py-3 font-medium">Ата-ана (оқушылар үшін)</th>
             </tr></thead>
             <tbody className="divide-y divide-[#E2E8F0]">
               {users.map(u => (
@@ -78,6 +92,23 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-3 text-[#64748B]">{u.level}</td>
                   <td className="px-6 py-3 text-[#64748B]">{Math.round(u.creative_score)}</td>
                   <td className="px-6 py-3 text-[#64748B]">{new Date(u.created_at).toLocaleDateString('kk')}</td>
+                  <td className="px-6 py-3">
+                    {u.role === 'student' ? (
+                      <select
+                        disabled={loadingParentId === u.id}
+                        value={u.parent_id || ''}
+                        onChange={(e) => linkParent(u.id, e.target.value)}
+                        className="px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                      >
+                        <option value="">Таңдау жоқ</option>
+                        {parents.map(p => (
+                          <option key={p.id} value={p.id}>{p.full_name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-[#94A3B8]">Қажет емес</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

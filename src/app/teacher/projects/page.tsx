@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Link2 } from 'lucide-react'
 
 export default function TeacherProjectsPage() {
   const { profile } = useAuth()
@@ -39,6 +39,20 @@ export default function TeacherProjectsPage() {
     setSaving(true)
     const total = Object.values(grading.scores as Record<string,number>).reduce((a:number,b:number)=>a+b,0)
     await supabase.from('project_submissions').update({ scores: grading.scores, total_score: total, feedback: grading.feedback, graded_by: profile.id }).eq('id', grading.id)
+    
+    const sub = submissions.find(s => s.id === grading.id)
+    if (sub) {
+      const { data: studentProfile } = await supabase.from('profiles').select('xp, creative_score').eq('id', sub.student_id).single()
+      if (studentProfile) {
+        const newXp = studentProfile.xp + total
+        const creativeBonus = (grading.scores['Креативтілік'] || 0) * 2
+        await supabase.from('profiles').update({ 
+          xp: newXp, 
+          creative_score: (studentProfile.creative_score || 0) + creativeBonus 
+        }).eq('id', sub.student_id)
+      }
+    }
+
     setGrading(null); setSaving(false)
     if (selectedProject) loadSubs(selectedProject)
   }
@@ -79,7 +93,11 @@ export default function TeacherProjectsPage() {
                     {s.total_score!=null?<span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">{s.total_score}</span>:
                     <button onClick={()=>setGrading({id:s.id,scores:{},feedback:''})} className="text-xs text-[#4F46E5]">Бағалау</button>}
                   </div>
-                  <p className="text-xs text-[#64748B]">{s.description}</p>
+                  <p className="text-xs text-[#64748B] mb-2">{s.description}</p>
+                  <div className="flex gap-2">
+                    {s.link_url && <a href={s.link_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1"><Link2 className="w-3 h-3"/> Жоба сілтемесі</a>}
+                    {s.file_url && <a href={s.file_url} target="_blank" rel="noreferrer" className="text-xs text-[#4F46E5] underline font-medium">📥 Жүктелген файл</a>}
+                  </div>
                   {grading?.id===s.id&&(
                     <div className="mt-3 border-t pt-3 space-y-2">
                       {crit.map((c:any)=>(

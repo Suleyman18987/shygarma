@@ -11,6 +11,7 @@ export default function StudentProjectsPage() {
   const [subs, setSubs] = useState<Record<string, any>>({})
   const [openId, setOpenId] = useState<string | null>(null)
   const [form, setForm] = useState({ description: '', link_url: '', team_name: '' })
+  const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -30,12 +31,25 @@ export default function StudentProjectsPage() {
   const handleSubmit = async (projectId: string) => {
     if (!profile) return
     setSubmitting(true)
+    let fileUrl = null
+    
+    if (file) {
+      const ext = file.name.split('.').pop()
+      const fileName = `${profile.id}_${Date.now()}.${ext}`
+      const { data: uploadData, error } = await supabase.storage.from('projects').upload(fileName, file)
+      if (!error && uploadData) {
+        const { data: { publicUrl } } = supabase.storage.from('projects').getPublicUrl(uploadData.path)
+        fileUrl = publicUrl
+      }
+    }
+
     const { data } = await supabase.from('project_submissions').insert({
-      project_id: projectId, student_id: profile.id, ...form,
+      project_id: projectId, student_id: profile.id, file_url: fileUrl, ...form,
     }).select().single()
     if (data) setSubs(prev => ({ ...prev, [projectId]: data }))
     setOpenId(null)
     setForm({ description: '', link_url: '', team_name: '' })
+    setFile(null)
     setSubmitting(false)
   }
 
@@ -67,6 +81,12 @@ export default function StudentProjectsPage() {
                   <input type="text" placeholder="Топ атауы (міндетті емес)" value={form.team_name} onChange={e => setForm(f => ({ ...f, team_name: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]" />
                   <textarea placeholder="Жоба сипаттамасы" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]" />
                   <input type="url" placeholder="Сілтеме (GitHub, YouTube, т.б.)" value={form.link_url} onChange={e => setForm(f => ({ ...f, link_url: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]" />
+                  
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-[#64748B] ml-1">Файл жүктеу (PDF, DOCX, ZIP)</label>
+                    <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EEF2FF] file:text-[#4F46E5] hover:file:bg-[#E0E7FF]" />
+                  </div>
+
                   <div className="flex gap-2">
                     <button onClick={() => handleSubmit(p.id)} disabled={submitting || !form.description} className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#4F46E5] text-white text-sm font-medium rounded-xl disabled:opacity-50">
                       {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Жіберу

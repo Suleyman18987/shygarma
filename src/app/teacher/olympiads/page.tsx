@@ -70,12 +70,12 @@ export default function TeacherOlympiadsPage() {
             <textarea placeholder="Шарт" value={pForm.description} onChange={e => setPForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm min-h-[50px]" />
             <div className="flex gap-2">
               <select value={pForm.type} onChange={e => setPForm(f => ({ ...f, type: e.target.value }))} className="px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm">
-                <option value="test">Тест</option><option value="short_answer">Қысқа жауап</option><option value="creative">Шығармашылық</option>
+                <option value="test">Тест</option><option value="short_answer">Қысқа жауап</option><option value="creative">Шығармашылық</option><option value="code">Код (Python)</option>
               </select>
               <input type="number" placeholder="Балл" value={pForm.points} onChange={e => setPForm(f => ({ ...f, points: +e.target.value }))} className="w-20 px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" />
             </div>
             {pForm.type === 'test' && <input placeholder="Нұсқалар (1-ші дұрыс, үтірмен бөлу)" value={pForm.options} onChange={e => setPForm(f => ({ ...f, options: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" />}
-            {pForm.type === 'short_answer' && <input placeholder="Дұрыс жауап" value={pForm.correct_answer} onChange={e => setPForm(f => ({ ...f, correct_answer: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" />}
+            {(pForm.type === 'short_answer' || pForm.type === 'code') && <input placeholder={pForm.type === 'code' ? "Дұрыс нәтиже (print арқылы шығатын мән)" : "Дұрыс жауап"} value={pForm.correct_answer} onChange={e => setPForm(f => ({ ...f, correct_answer: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" />}
             <button onClick={addProblem} disabled={!pForm.title} className="px-4 py-2 text-sm bg-[#EEF2FF] text-[#4F46E5] rounded-xl font-medium disabled:opacity-50">+ Есеп қосу</button>
           </div>
           {problems.map((p, i) => <div key={i} className="bg-[#F8FAFC] rounded-xl p-3 text-sm flex justify-between"><span>{i + 1}. {p.title} ({p.type}) — {p.points}б</span><button onClick={() => setProblems(problems.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4 text-red-400" /></button></div>)}
