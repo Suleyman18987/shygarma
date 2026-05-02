@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
-  title: "Shygarma — Шығармашылық олимпиада платформасы",
+  title: "DarynSpace — Шығармашылық олимпиада платформасы",
   description: "Білім алушылардың шығармашылық белсенділігін арттыруға арналған олимпиада және жоба платформасы",
 };
 

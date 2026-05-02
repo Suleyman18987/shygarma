@@ -11,7 +11,7 @@ export default function LandingPage() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center">
             <Star className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-[#0F172A]">Shygarma</span>
+          <span className="text-xl font-bold text-[#0F172A]">DarynSpace</span>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/login" className="px-5 py-2.5 text-sm font-medium text-[#4F46E5] hover:bg-[#EEF2FF] rounded-xl transition-colors">
@@ -115,7 +115,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="px-6 lg:px-16 py-8 border-t border-[#E2E8F0] text-center text-sm text-[#94A3B8]">
-        © 2026 Shygarma Platform. Барлық құқықтар қорғалған.
+        © 2026 Bibigul Tulekova. Барлық құқықтар қорғалған.
       </footer>
     </div>
   )

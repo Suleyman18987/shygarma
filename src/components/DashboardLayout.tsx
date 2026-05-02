@@ -78,7 +78,7 @@ export default function DashboardLayout({ children, role }: { children: React.Re
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center shrink-0">
             <Star className="w-5 h-5 text-white" />
           </div>
-          <span className="text-lg font-bold text-[#0F172A]">Shygarma</span>
+          <span className="text-lg font-bold text-[#0F172A]">DarynSpace</span>
           <button className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X className="w-5 h-5 text-[#64748B]" />
           </button>

@@ -50,7 +50,7 @@ export default function RegisterPage() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center">
             <Star className="w-6 h-6 text-white" />
           </div>
-          <span className="text-2xl font-bold text-[#0F172A]">Shygarma</span>
+          <span className="text-2xl font-bold text-[#0F172A]">DarynSpace</span>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-8 shadow-sm">
