@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Profile } from '@/lib/types'
 import { User } from '@supabase/supabase-js'
@@ -25,21 +25,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
-  // Prevent double-initialization from getUser + onAuthStateChange
-  const initialized = useRef(false)
 
-  const fetchProfile = async (userId: string): Promise<void> => {
+  const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
-      if (data && !error) {
-        setProfile(data as Profile)
-      } else {
-        setProfile(null)
-      }
+      if (data) setProfile(data as Profile)
+      else setProfile(null)
     } catch {
       setProfile(null)
     }
@@ -50,42 +45,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Safety timeout: if loading hasn't resolved in 8s, force it false
-    const safetyTimer = setTimeout(() => {
-      setLoading(false)
-    }, 8000)
+    // Hard timeout: loading never gets stuck more than 6s
+    const timeout = setTimeout(() => setLoading(false), 6000)
 
-    // onAuthStateChange is the single source of truth for session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        clearTimeout(safetyTimer)
-
-        setUser(session?.user ?? null)
-
+    // Primary: use getSession() which reads from cookie WITHOUT a network call
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
+          setUser(session.user)
           await fetchProfile(session.user.id)
         } else {
+          setUser(null)
           setProfile(null)
         }
-
+      } catch {
+        setUser(null)
+        setProfile(null)
+      } finally {
+        clearTimeout(timeout)
         setLoading(false)
-        initialized.current = true
+      }
+    }
+
+    init()
+
+    // Secondary: listen for future auth events (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setProfile(null)
+        } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+          setUser(session.user)
+          await fetchProfile(session.user.id)
+        }
+        // Don't touch loading here — init() handles it
       }
     )
 
-    // Kick off initial session check; onAuthStateChange will handle the result
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!initialized.current) {
-        // If no session and onAuthStateChange hasn't fired yet, stop loading
-        if (!session) {
-          setLoading(false)
-          initialized.current = true
-        }
-      }
-    })
-
     return () => {
-      clearTimeout(safetyTimer)
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -46,10 +46,11 @@ export default function DashboardLayout({ children, role }: { children: React.Re
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
-    if (!loading && !profile && !user) {
+    // Only redirect if fully loaded and NO user session at all
+    if (!loading && !user) {
       router.push('/login')
     }
-  }, [loading, profile, user, router])
+  }, [loading, user, router])
 
   if (loading) {
     return (
@@ -59,10 +60,20 @@ export default function DashboardLayout({ children, role }: { children: React.Re
     )
   }
 
-  if (!profile) return null
+  // If user exists but profile not yet loaded, show a brief loading state
+  if (user && !profile) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#4F46E5] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // If no user and not loading, redirect has been triggered — render nothing
+  if (!user) return null
 
   const items = navItems[role] || []
-  const levelProgress = (profile.xp % 100) / 100
+  const levelProgress = profile ? (profile.xp % 100) / 100 : 0
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -112,18 +123,18 @@ export default function DashboardLayout({ children, role }: { children: React.Re
           <div className="bg-[#F8FAFC] rounded-xl p-3">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white text-sm font-bold">
-                {profile.full_name.charAt(0).toUpperCase() || '?'}
+                {(profile?.full_name?.charAt(0)?.toUpperCase()) || '?'}
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-[#0F172A] truncate">{profile.full_name || 'User'}</div>
-                <div className="text-xs text-[#64748B] capitalize">{profile.role}</div>
+                <div className="text-sm font-semibold text-[#0F172A] truncate">{profile?.full_name || 'User'}</div>
+                <div className="text-xs text-[#64748B] capitalize">{profile?.role}</div>
               </div>
             </div>
-            {profile.role === 'student' && (
+            {profile?.role === 'student' && (
               <div className="mt-2">
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[#64748B]">Level {profile.level}</span>
-                  <span className="text-[#4F46E5] font-medium">{profile.xp} XP</span>
+                  <span className="text-[#64748B]">Level {profile?.level}</span>
+                  <span className="text-[#4F46E5] font-medium">{profile?.xp} XP</span>
                 </div>
                 <div className="h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] rounded-full transition-all" style={{ width: `${levelProgress * 100}%` }} />
@@ -148,13 +159,13 @@ export default function DashboardLayout({ children, role }: { children: React.Re
             <Menu className="w-5 h-5 text-[#64748B]" />
           </button>
           <div className="flex-1" />
-          {profile.role === 'student' && (
+          {profile?.role === 'student' && (
             <div className="hidden sm:flex items-center gap-4 text-sm">
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EEF2FF] rounded-lg">
-                <span className="text-[#4F46E5] font-semibold">{profile.xp} XP</span>
+                <span className="text-[#4F46E5] font-semibold">{profile?.xp} XP</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5F3FF] rounded-lg">
-                <span className="text-[#7C3AED] font-semibold">CS: {Math.round(profile.creative_score)}</span>
+                <span className="text-[#7C3AED] font-semibold">CS: {Math.round(profile?.creative_score ?? 0)}</span>
               </div>
             </div>
           )}
@@ -162,7 +173,7 @@ export default function DashboardLayout({ children, role }: { children: React.Re
             <Bell className="w-5 h-5 text-[#64748B]" />
           </button>
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white text-sm font-bold">
-            {profile.full_name.charAt(0).toUpperCase() || '?'}
+            {(profile?.full_name?.charAt(0)?.toUpperCase()) || '?'}
           </div>
         </header>
 
