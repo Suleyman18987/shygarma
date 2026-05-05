@@ -19,27 +19,33 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (signInError || !data?.user) {
         setError('Қате email немесе құпия сөз')
         setLoading(false)
         return
       }
 
-      if (data?.user) {
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-        if (profileError || !profile) {
-          setError('Профиль табылмады')
-          setLoading(false)
-          return
-        }
-        router.push(`/${profile.role}`)
-      } else {
-        setError('Күтпеген қате: пайдаланушы табылмады')
+      // Fetch profile to get role
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        setError('Профиль табылмады. Қайтадан тіркеліп көріңіз.')
         setLoading(false)
+        return
       }
-    } catch (err: any) {
-      setError(err.message || 'Белгісіз қате шықты')
+
+      // Navigate — loading state stays true during navigation (intentional)
+      router.push(`/${profile.role}`)
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Белгісіз қате шықты'
+      setError(message)
       setLoading(false)
     }
   }

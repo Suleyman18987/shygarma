@@ -46,10 +46,10 @@ export default function DashboardLayout({ children, role }: { children: React.Re
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
-    if (!loading && !profile) {
+    if (!loading && !profile && !user) {
       router.push('/login')
     }
-  }, [loading, profile, router])
+  }, [loading, profile, user, router])
 
   if (loading) {
     return (
