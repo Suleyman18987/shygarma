@@ -40,7 +40,7 @@ const navItems: Record<UserRole, { label: string; href: string; icon: React.Elem
 }
 
 export default function DashboardLayout({ children, role }: { children: React.ReactNode; role: UserRole }) {
-  const { user, profile, loading, signOut } = useAuth()
+  const { user, profile, loading, authError, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -64,12 +64,22 @@ export default function DashboardLayout({ children, role }: { children: React.Re
   if (user && !profile) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
-        <div className="w-8 h-8 border-4 border-[#4F46E5] border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-gray-600 mb-2">Профиль жүктелуде немесе желіде ақау бар...</p>
-        <p className="text-xs text-gray-400 mb-6 max-w-sm text-center">Егер бұл ұзаққа созылса, аккаунттан шығып, қайта кіріңіз.</p>
+        <div className="w-12 h-12 border-4 border-[#4F46E5] border-t-transparent rounded-full animate-spin mb-6" />
+        <h2 className="text-xl font-medium text-[#1E293B] text-center mb-2">
+          Профиль жүктелуде немесе желіде ақау бар...
+        </h2>
+        {authError ? (
+          <p className="text-red-500 text-sm text-center mb-6 max-w-md bg-red-50 p-3 rounded-lg border border-red-100 font-mono">
+            Қате коды: {authError}
+          </p>
+        ) : (
+          <p className="text-[#64748B] text-sm text-center mb-8 max-w-md">
+            Егер бұл ұзаққа созылса, аккаунттан шығып, қайта кіріңіз.
+          </p>
+        )}
         <button
-          onClick={signOut}
-          className="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-colors"
+          onClick={handleLogout}
+          className="px-6 py-2.5 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-colors"
         >
           Шығу
         </button>

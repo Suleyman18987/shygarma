@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
+  authError: string | null
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
+  authError: null,
   signOut: async () => {},
   refreshProfile: async () => {},
 })
@@ -57,10 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Hard timeout: loading never gets stuck more than 6s
     const timeout = setTimeout(() => setLoading(false), 6000)
 
-    // Primary: use getUser() to ensure token is valid with the server
+    let subscription: { unsubscribe: () => void } | null = null
+    let mounted = true
+
     const init = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError) setAuthError(userError.message)
+        
         if (user) {
           setUser(user)
           await fetchProfile(user.id)
@@ -68,34 +74,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null)
           setProfile(null)
         }
-      } catch {
+      } catch (e: any) {
+        setAuthError(e?.message || 'Unknown error')
         setUser(null)
         setProfile(null)
       } finally {
         clearTimeout(timeout)
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
 
-    init()
-
-    // Secondary: listen for future auth events (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setProfile(null)
-        } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-          setUser(session.user)
-          await fetchProfile(session.user.id)
+    init().then(() => {
+      if (!mounted) return
+      
+      // Secondary: listen for future auth events AFTER init to avoid lock race condition
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (event === 'SIGNED_OUT') {
+            setUser(null)
+            setProfile(null)
+          } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            setUser(session.user)
+            await fetchProfile(session.user.id)
+          }
         }
-        // Don't touch loading here — init() handles it
-      }
-    )
+      )
+      subscription = data.subscription
+    })
 
     return () => {
+      mounted = false
       clearTimeout(timeout)
-      subscription.unsubscribe()
+      subscription?.unsubscribe()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
