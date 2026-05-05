@@ -78,7 +78,7 @@ export default function DashboardLayout({ children, role }: { children: React.Re
           </p>
         )}
         <button
-          onClick={handleLogout}
+          onClick={signOut}
           className="px-6 py-2.5 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-colors"
         >
           Шығу
