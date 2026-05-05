@@ -60,11 +60,19 @@ export default function DashboardLayout({ children, role }: { children: React.Re
     )
   }
 
-  // If user exists but profile not yet loaded, show a brief loading state
+  // If user exists but profile not yet loaded, show a brief loading state or error
   if (user && !profile) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#4F46E5] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-4 border-[#4F46E5] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-gray-600 mb-2">Профиль жүктелуде немесе желіде ақау бар...</p>
+        <p className="text-xs text-gray-400 mb-6 max-w-sm text-center">Егер бұл ұзаққа созылса, аккаунттан шығып, қайта кіріңіз.</p>
+        <button
+          onClick={signOut}
+          className="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-colors"
+        >
+          Шығу
+        </button>
       </div>
     )
   }

@@ -28,14 +28,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
-      if (data) setProfile(data as Profile)
-      else setProfile(null)
-    } catch {
+      
+      if (error) {
+        console.error('Supabase profile fetch error:', error)
+      }
+        
+      if (data && !error) {
+        setProfile(data as Profile)
+      } else {
+        setProfile(null)
+      }
+    } catch (e) {
+      console.error('Unexpected error fetching profile:', e)
       setProfile(null)
     }
   }
@@ -48,13 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Hard timeout: loading never gets stuck more than 6s
     const timeout = setTimeout(() => setLoading(false), 6000)
 
-    // Primary: use getSession() which reads from cookie WITHOUT a network call
+    // Primary: use getUser() to ensure token is valid with the server
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
-          setUser(session.user)
-          await fetchProfile(session.user.id)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setUser(user)
+          await fetchProfile(user.id)
         } else {
           setUser(null)
           setProfile(null)
