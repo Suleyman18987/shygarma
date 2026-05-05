@@ -6,7 +6,7 @@ import { BarChart3, Target } from 'lucide-react'
 
 export default function StudentProgressPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [badges, setBadges] = useState<any[]>([])
   const [stats, setStats] = useState({ olympiadSubs: 0, assignmentSubs: 0, projectSubs: 0, correctAnswers: 0 })
 

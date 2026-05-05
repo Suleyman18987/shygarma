@@ -6,7 +6,7 @@ import { Trophy, Medal, Crown } from 'lucide-react'
 
 export default function LeaderboardPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [students, setStudents] = useState<any[]>([])
 
   useEffect(() => {

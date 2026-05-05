@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()

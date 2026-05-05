@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { BarChart3, PieChart } from 'lucide-react'
 
 export default function AdminAnalyticsPage() {
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [stats, setStats] = useState({ byRole: [] as any[], totalXP: 0, avgCS: 0 })
 
   useEffect(() => {

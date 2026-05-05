@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react'
 
 export default function ParentDashboard() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [child, setChild] = useState<any>(null)
   const [grades, setGrades] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

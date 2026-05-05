@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { UserPlus, Trash2, Loader2 } from 'lucide-react'
 
 export default function AdminUsersPage() {
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [users, setUsers] = useState<any[]>([])
   const [parents, setParents] = useState<any[]>([])
   const [filter, setFilter] = useState('all')

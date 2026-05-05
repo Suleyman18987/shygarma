@@ -6,7 +6,7 @@ import { Plus, Loader2, Trash2 } from 'lucide-react'
 
 export default function TeacherOlympiadsPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [olympiads, setOlympiads] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', start_time: '', end_time: '' })

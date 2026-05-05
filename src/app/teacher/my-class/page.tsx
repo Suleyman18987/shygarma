@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export default function TeacherMyClassPage() {
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [students, setStudents] = useState<any[]>([])
   const [parents, setParents] = useState<any[]>([])
   const [loadingParentId, setLoadingParentId] = useState<string | null>(null)

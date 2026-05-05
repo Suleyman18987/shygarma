@@ -6,7 +6,7 @@ import { Clock, Users as UsersIcon, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 export default function StudentOlympiadsPage() {
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [olympiads, setOlympiads] = useState<any[]>([])
   const [tab, setTab] = useState<'active' | 'finished'>('active')
 

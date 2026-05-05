@@ -6,7 +6,7 @@ import { Clock, CheckCircle, Upload, Loader2 } from 'lucide-react'
 
 export default function StudentAssignmentsPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [assignments, setAssignments] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<Record<string, any>>({})
   const [openId, setOpenId] = useState<string | null>(null)

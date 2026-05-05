@@ -8,7 +8,7 @@ import { Clock, CheckCircle, XCircle, Loader2, Send } from 'lucide-react'
 export default function OlympiadDetailPage() {
   const { id } = useParams()
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [olympiad, setOlympiad] = useState<any>(null)
   const [problems, setProblems] = useState<any[]>([])
   const [answers, setAnswers] = useState<Record<string, string>>({})

@@ -6,7 +6,7 @@ import { Bell, Check } from 'lucide-react'
 
 export default function ParentNotificationsPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [notifs, setNotifs] = useState<any[]>([])
 
   useEffect(() => {

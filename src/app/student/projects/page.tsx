@@ -6,7 +6,7 @@ import { Clock, Upload, Loader2, Link2, ArrowRight } from 'lucide-react'
 
 export default function StudentProjectsPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [projects, setProjects] = useState<any[]>([])
   const [subs, setSubs] = useState<Record<string, any>>({})
   const [openId, setOpenId] = useState<string | null>(null)

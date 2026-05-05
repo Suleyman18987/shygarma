@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { Users, Trophy, ClipboardList, TrendingUp } from 'lucide-react'
 
 export default function AdminDashboard() {
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [stats, setStats] = useState({ users: 0, olympiads: 0, assignments: 0, submissions: 0 })
   const [recentUsers, setRecentUsers] = useState<any[]>([])
 

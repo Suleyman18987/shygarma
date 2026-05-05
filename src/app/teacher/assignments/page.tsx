@@ -6,7 +6,7 @@ import { Plus, Loader2, CheckCircle } from 'lucide-react'
 
 export default function TeacherAssignmentsPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [assignments, setAssignments] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', deadline: '', max_score: 100 })

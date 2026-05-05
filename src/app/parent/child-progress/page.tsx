@@ -6,7 +6,7 @@ import { BarChart3, Target } from 'lucide-react'
 
 export default function ParentChildProgressPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [child, setChild] = useState<any>(null)
   const [grades, setGrades] = useState<any[]>([])
 

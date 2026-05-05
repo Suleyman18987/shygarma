@@ -6,7 +6,7 @@ import { Users, ClipboardList, Trophy, FolderKanban } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [stats, setStats] = useState({ students: 0, pending: 0, olympiads: 0, projects: 0 })
   const [pendingSubs, setPendingSubs] = useState<any[]>([])
 

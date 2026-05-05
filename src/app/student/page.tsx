@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export default function StudentDashboard() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [stats, setStats] = useState({ olympiads: 0, assignments: 0, projects: 0 })
   const [upcoming, setUpcoming] = useState<any[]>([])
 

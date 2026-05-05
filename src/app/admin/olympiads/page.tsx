@@ -6,7 +6,7 @@ import { Plus, Loader2 } from 'lucide-react'
 
 export default function AdminOlympiadsPage() {
   const { profile } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [olympiads, setOlympiads] = useState<any[]>([])
 
   useEffect(() => {
