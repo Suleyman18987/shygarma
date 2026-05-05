@@ -40,7 +40,7 @@ const navItems: Record<UserRole, { label: string; href: string; icon: React.Elem
 }
 
 export default function DashboardLayout({ children, role }: { children: React.ReactNode; role: UserRole }) {
-  const { profile, loading, signOut } = useAuth()
+  const { user, profile, loading, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
