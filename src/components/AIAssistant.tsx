@@ -47,16 +47,85 @@ export default function AIAssistant() {
       })
 
       if (!response.ok) {
-        throw new Error('Сұранысты орындау мүмкін болмады')
-      }
+        // Fallback: Call Gemini API directly from browser using client-side fetch
+        const clientApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''
+        
+        if (!clientApiKey) {
+          throw new Error('ИИ кілті теңшелінбеген')
+        }
 
-      const data = await response.json()
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.response }])
+        const contents = newMessages.map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }))
+        const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Жауаптарыңды қазақ тілінде бер. Мұғалімдерге және оқушыларға олимпиада және жоба жұмыстары бойынша көмектес. Қысқа және нақты жауап бер.'
+
+        const clientResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${clientApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents,
+              systemInstruction: {
+                parts: [{ text: systemInstruction }]
+              }
+            })
+          }
+        )
+
+        if (!clientResponse.ok) {
+          throw new Error('Сұранысты орындау мүмкін болмады (Сервер және клиент шектеулі)')
+        }
+
+        const data = await clientResponse.json()
+        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        setMessages((prev) => [...prev, { role: 'assistant', content: aiText }])
+      } else {
+        const data = await response.json()
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.response }])
+      }
     } catch (error: any) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: `Қате орын алды: ${error.message || 'Сервер жауап бермеді.'}` }
-      ])
+      try {
+        const clientApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''
+        
+        if (!clientApiKey) {
+          throw new Error('ИИ кілті теңшелінбеген')
+        }
+
+        const contents = newMessages.map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }))
+        const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Жауаптарыңды қазақ тілінде бер.'
+
+        const backupResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${clientApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents,
+              systemInstruction: {
+                parts: [{ text: systemInstruction }]
+              }
+            })
+          }
+        )
+
+        if (!backupResponse.ok) {
+          throw new Error('Сұраныс қабылданбады')
+        }
+
+        const data = await backupResponse.json()
+        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        setMessages((prev) => [...prev, { role: 'assistant', content: aiText }])
+      } catch (innerError) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `Қате орын алды: ${error.message || 'Сервер жауап бермеді.'}` }
+        ])
+      }
     } finally {
       setLoading(false)
     }
