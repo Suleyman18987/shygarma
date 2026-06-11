@@ -4,6 +4,29 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Clock, CheckCircle, XCircle, Loader2, Send } from 'lucide-react'
+import AntiCheat from '@/components/AntiCheat'
+import { updateUserXP } from '@/lib/xp-utils'
+import { calculateCreativeScore } from '@/lib/creative-score'
+
+function seededShuffle(array: any[], seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0
+  }
+  const rand = () => {
+    let t = h += 0x6D2B79F5
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+
+  const arr = [...array]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
 
 export default function OlympiadDetailPage() {
   const { id } = useParams()
@@ -17,6 +40,11 @@ export default function OlympiadDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState('')
+
+  // Timer states
+  const [timeLeft, setTimeLeft] = useState<string>('')
+  const [isTimeUp, setIsTimeUp] = useState(false)
+  const [timerColor, setTimerColor] = useState('text-green-600')
 
   const handleRunCode = async (problemId: string) => {
     setRunning(true)
@@ -40,11 +68,55 @@ export default function OlympiadDetailPage() {
   }
 
   useEffect(() => {
+    if (!olympiad || !olympiad.end_time) return
+
+    const interval = setInterval(() => {
+      const end = new Date(olympiad.end_time).getTime()
+      const now = new Date().getTime()
+      const diff = end - now
+
+      if (diff <= 0) {
+        clearInterval(interval)
+        setTimeLeft('Уақыт бітті!')
+        setIsTimeUp(true)
+        setTimerColor('text-red-600 font-bold')
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60))
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+        const formatted = [
+          hours.toString().padStart(2, '0'),
+          minutes.toString().padStart(2, '0'),
+          seconds.toString().padStart(2, '0')
+        ].join(':')
+
+        setTimeLeft(formatted)
+
+        if (diff < 1000 * 60 * 1) {
+          setTimerColor('text-red-600 animate-pulse font-extrabold')
+        } else if (diff < 1000 * 60 * 5) {
+          setTimerColor('text-amber-500 font-bold')
+        } else {
+          setTimerColor('text-green-600')
+        }
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [olympiad])
+
+  useEffect(() => {
     const load = async () => {
       const { data: o } = await supabase.from('olympiads').select('*').eq('id', id).single()
       setOlympiad(o)
       const { data: p } = await supabase.from('problems').select('*').eq('olympiad_id', id).order('order_index')
-      setProblems(p || [])
+      
+      let loadedProblems = p || []
+      if (loadedProblems.length > 0 && profile) {
+        loadedProblems = seededShuffle(loadedProblems, profile.id)
+      }
+      setProblems(loadedProblems)
 
       if (profile) {
         const { data: subs } = await supabase.from('olympiad_submissions').select('*').eq('student_id', profile.id)
@@ -100,10 +172,11 @@ export default function OlympiadDetailPage() {
 
     if (data) {
       setSubmissions(prev => ({ ...prev, [problemId]: data }))
-      // Add XP
+      // Add XP & check levels/badges
       if (score > 0) {
-        await supabase.from('profiles').update({ xp: profile.xp + score }).eq('id', profile.id)
+        await updateUserXP(supabase, profile.id, score)
       }
+      await calculateCreativeScore(supabase, profile.id)
     }
     setSubmitting(false)
   }
@@ -113,139 +186,152 @@ export default function OlympiadDetailPage() {
   const current = problems[currentIdx]
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#0F172A] mb-1">{olympiad.title}</h1>
-        <p className="text-sm text-[#64748B]">{olympiad.description}</p>
-        {olympiad.end_time && (
-          <div className="flex items-center gap-1.5 text-sm text-[#F59E0B] mt-2">
-            <Clock className="w-4 h-4" />
-            Аяқталу: {new Date(olympiad.end_time).toLocaleString('kk')}
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-6 flex-col lg:flex-row">
-        {/* Problem list */}
-        <div className="lg:w-48 shrink-0">
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-1">
-            {problems.map((p, i) => {
-              const sub = submissions[p.id]
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setCurrentIdx(i)
-                    setRunResult('')
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-xl transition-colors ${
-                    currentIdx === i ? 'bg-[#EEF2FF] text-[#4F46E5] font-medium' : 'text-[#64748B] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  {sub ? (
-                    sub.is_correct === true ? <CheckCircle className="w-4 h-4 text-green-500" /> :
-                    sub.is_correct === false ? <XCircle className="w-4 h-4 text-red-500" /> :
-                    <CheckCircle className="w-4 h-4 text-blue-500" />
-                  ) : <div className="w-4 h-4 rounded-full border-2 border-[#E2E8F0]" />}
-                  Есеп {i + 1}
-                </button>
-              )
-            })}
-          </div>
+    <AntiCheat enabled={true}>
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-[#0F172A] mb-1">{olympiad.title}</h1>
+          <p className="text-sm text-[#64748B]">{olympiad.description}</p>
+          {olympiad.end_time && (
+            <div className="flex items-center gap-6 mt-2">
+              <div className="flex items-center gap-1.5 text-sm text-[#F59E0B]">
+                <Clock className="w-4 h-4" />
+                Аяқталу: {new Date(olympiad.end_time).toLocaleString('kk')}
+              </div>
+              {timeLeft && (
+                <div className="flex items-center gap-1.5 text-sm font-semibold">
+                  <span className="text-[#64748B]">Қалған уақыт:</span>
+                  <span className={timerColor}>{timeLeft}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Problem detail */}
-        {current && (
-          <div className="flex-1 bg-white rounded-2xl border border-[#E2E8F0] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-[#0F172A]">{current.title}</h2>
-              <span className="text-sm text-[#4F46E5] font-medium">{current.points} балл</span>
+        <div className="flex gap-6 flex-col lg:flex-row">
+          {/* Problem list */}
+          <div className="lg:w-48 shrink-0">
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-1">
+              {problems.map((p, i) => {
+                const sub = submissions[p.id]
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setCurrentIdx(i)
+                      setRunResult('')
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-xl transition-colors ${
+                      currentIdx === i ? 'bg-[#EEF2FF] text-[#4F46E5] font-medium' : 'text-[#64748B] hover:bg-[#F8FAFC]'
+                    }`}
+                  >
+                    {sub ? (
+                      sub.is_correct === true ? <CheckCircle className="w-4 h-4 text-green-500" /> :
+                      sub.is_correct === false ? <XCircle className="w-4 h-4 text-red-500" /> :
+                      <CheckCircle className="w-4 h-4 text-blue-500" />
+                    ) : <div className="w-4 h-4 rounded-full border-2 border-[#E2E8F0]" />}
+                    Есеп {i + 1}
+                  </button>
+                )
+              })}
             </div>
-            <p className="text-sm text-[#64748B] mb-6 whitespace-pre-wrap">{current.description}</p>
+          </div>
 
-            {submissions[current.id] ? (
-              <div className={`p-4 rounded-xl ${submissions[current.id].is_correct === true ? 'bg-green-50 border border-green-200' : submissions[current.id].is_correct === false ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
-                <div className="text-sm font-medium mb-1">
-                  {submissions[current.id].is_correct === true ? '✅ Дұрыс!' : submissions[current.id].is_correct === false ? '❌ Қате' : '📝 Жіберілді (мұғалім тексереді)'}
-                </div>
-                <div className="text-sm text-[#64748B]">Сіздің жауабыңыз: {submissions[current.id].answer}</div>
-                <div className="text-sm font-medium mt-1">Балл: {submissions[current.id].score}/{current.points}</div>
+          {/* Problem detail */}
+          {current && (
+            <div className="flex-1 bg-white rounded-2xl border border-[#E2E8F0] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-[#0F172A]">{current.title}</h2>
+                <span className="text-sm text-[#4F46E5] font-medium">{current.points} балл</span>
               </div>
-            ) : (
-              <div>
-                {current.type === 'test' && current.options ? (
-                  <div className="space-y-2 mb-4">
-                    {current.options.map((opt: any, i: number) => (
-                      <label key={i} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${answers[current.id] === opt.text ? 'border-[#4F46E5] bg-[#EEF2FF]' : 'border-[#E2E8F0] hover:bg-[#F8FAFC]'}`}>
-                        <input type="radio" name={`q_${current.id}`} value={opt.text} checked={answers[current.id] === opt.text} onChange={() => setAnswers(p => ({ ...p, [current.id]: opt.text }))} className="accent-[#4F46E5]" />
-                        <span className="text-sm">{opt.text}</span>
-                      </label>
-                    ))}
+              <p className="text-sm text-[#64748B] mb-6 whitespace-pre-wrap">{current.description}</p>
+
+              {submissions[current.id] ? (
+                <div className={`p-4 rounded-xl ${submissions[current.id].is_correct === true ? 'bg-green-50 border border-green-200' : submissions[current.id].is_correct === false ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
+                  <div className="text-sm font-medium mb-1">
+                    {submissions[current.id].is_correct === true ? '✅ Дұрыс!' : submissions[current.id].is_correct === false ? '❌ Қате' : '📝 Жіберілді (мұғалім тексереді)'}
                   </div>
-                ) : current.type === 'short_answer' ? (
-                  <input
-                    type="text"
-                    value={answers[current.id] || ''}
-                    onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
-                    className="w-full px-4 py-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                    placeholder="Жауабыңызды жазыңыз..."
-                  />
-                ) : current.type === 'code' ? (
-                  <div className="mb-4">
-                    <p className="text-xs text-[#64748B] mb-2 font-medium">Код жазу (Python)</p>
-                    <textarea
+                  <div className="text-sm text-[#64748B]">Сіздің жауабыңыз: {submissions[current.id].answer}</div>
+                  <div className="text-sm font-medium mt-1">Балл: {submissions[current.id].score}/{current.points}</div>
+                </div>
+              ) : (
+                <div>
+                  {current.type === 'test' && current.options ? (
+                    <div className="space-y-2 mb-4">
+                      {current.options.map((opt: any, i: number) => (
+                        <label key={i} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${answers[current.id] === opt.text ? 'border-[#4F46E5] bg-[#EEF2FF]' : 'border-[#E2E8F0] hover:bg-[#F8FAFC]'}`}>
+                          <input type="radio" name={`q_${current.id}`} value={opt.text} checked={answers[current.id] === opt.text} onChange={() => setAnswers(p => ({ ...p, [current.id]: opt.text }))} className="accent-[#4F46E5]" disabled={isTimeUp} />
+                          <span className="text-sm">{opt.text}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : current.type === 'short_answer' ? (
+                    <input
+                      type="text"
+                      value={answers[current.id] || ''}
+                      onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
+                      className="w-full px-4 py-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                      placeholder="Жауабыңызды жазыңыз..."
+                      disabled={isTimeUp}
+                    />
+                  ) : current.type === 'code' ? (
+                    <div className="mb-4">
+                      <p className="text-xs text-[#64748B] mb-2 font-medium">Код жазу (Python)</p>
+                      <textarea
                       value={answers[current.id] || ''}
                       onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
                       className="w-full px-4 py-3 bg-[#1E293B] text-green-400 font-mono border border-[#0F172A] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] min-h-[250px]"
                       placeholder="def solve():&#10;    # Кодыңызды осында жазыңыз&#10;    print('Hello World')&#10;&#10;solve()"
+                      disabled={isTimeUp}
                     />
-                    {runResult && (
-                      <div className="mt-3 p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-mono">
-                        <div className="font-semibold text-[#64748B] mb-1">Орындау нәтижесі:</div>
-                        <pre className="whitespace-pre-wrap">{runResult}</pre>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <textarea
-                    value={answers[current.id] || ''}
-                    onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
-                    className="w-full px-4 py-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4F46E5] min-h-[120px]"
-                    placeholder="Шығармашылық жауабыңызды жазыңыз..."
-                  />
-                )}
-                
-                <div className="flex gap-2">
-                  {current.type === 'code' && (
-                    <button
-                      onClick={() => handleRunCode(current.id)}
-                      disabled={running || !answers[current.id]}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-medium text-sm rounded-xl disabled:opacity-50 transition-colors"
-                    >
-                      {running ? <Loader2 className="w-4 h-4 animate-spin" /> : '▶'} Run Code
-                    </button>
+                      {runResult && (
+                        <div className="mt-3 p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-mono">
+                          <div className="font-semibold text-[#64748B] mb-1">Орындау нәтижесі:</div>
+                          <pre className="whitespace-pre-wrap">{runResult}</pre>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={answers[current.id] || ''}
+                      onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
+                      className="w-full px-4 py-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4F46E5] min-h-[120px]"
+                      placeholder="Шығармашылық жауабыңызды жазыңыз..."
+                      disabled={isTimeUp}
+                    />
                   )}
-                  <button
-                    onClick={() => handleSubmit(current.id)}
-                    disabled={submitting || !answers[current.id]}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-medium text-sm rounded-xl disabled:opacity-50 transition-colors"
-                  >
-                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Жіберу
-                  </button>
+                  
+                  <div className="flex gap-2">
+                    {current.type === 'code' && (
+                      <button
+                        onClick={() => handleRunCode(current.id)}
+                        disabled={running || !answers[current.id] || isTimeUp}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-medium text-sm rounded-xl disabled:opacity-50 transition-colors"
+                      >
+                        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : '▶'} Run Code
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleSubmit(current.id)}
+                      disabled={submitting || !answers[current.id] || isTimeUp}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-medium text-sm rounded-xl disabled:opacity-50 transition-colors"
+                    >
+                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      {isTimeUp ? 'Уақыт бітті!' : 'Жіберу'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Navigation */}
-            <div className="flex justify-between mt-6 pt-4 border-t border-[#E2E8F0]">
-              <button onClick={() => { setCurrentIdx(Math.max(0, currentIdx - 1)); setRunResult('') }} disabled={currentIdx === 0} className="text-sm text-[#64748B] hover:text-[#0F172A] disabled:opacity-30">← Алдыңғы</button>
-              <span className="text-sm text-[#94A3B8]">{currentIdx + 1} / {problems.length}</span>
-              <button onClick={() => { setCurrentIdx(Math.min(problems.length - 1, currentIdx + 1)); setRunResult('') }} disabled={currentIdx === problems.length - 1} className="text-sm text-[#64748B] hover:text-[#0F172A] disabled:opacity-30">Келесі →</button>
+              {/* Navigation */}
+              <div className="flex justify-between mt-6 pt-4 border-t border-[#E2E8F0]">
+                <button onClick={() => { setCurrentIdx(Math.max(0, currentIdx - 1)); setRunResult('') }} disabled={currentIdx === 0} className="text-sm text-[#64748B] hover:text-[#0F172A] disabled:opacity-30">← Алдыңғы</button>
+                <span className="text-sm text-[#94A3B8]">{currentIdx + 1} / {problems.length}</span>
+                <button onClick={() => { setCurrentIdx(Math.min(problems.length - 1, currentIdx + 1)); setRunResult('') }} disabled={currentIdx === problems.length - 1} className="text-sm text-[#64748B] hover:text-[#0F172A] disabled:opacity-30">Келесі →</button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </AntiCheat>
   )
 }

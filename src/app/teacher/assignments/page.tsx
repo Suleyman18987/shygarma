@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Plus, Loader2, CheckCircle } from 'lucide-react'
+import { updateUserXP } from '@/lib/xp-utils'
+import { notifyStudentsOfNewAssignment, notifyGraded } from '@/lib/notification-utils'
+import { calculateCreativeScore } from '@/lib/creative-score'
 
 export default function TeacherAssignmentsPage() {
   const { profile } = useAuth()
@@ -16,11 +19,20 @@ export default function TeacherAssignmentsPage() {
   const [grading, setGrading] = useState<{ id: string; score: string; feedback: string } | null>(null)
 
   const loadAssignments = async () => {
-    const { data } = await supabase.from('assignments').select('*').order('created_at', { ascending: false })
+    if (!profile) return
+    const { data } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('created_by', profile.id)
+      .order('created_at', { ascending: false })
     setAssignments(data || [])
   }
 
-  useEffect(() => { loadAssignments() }, [])
+  useEffect(() => {
+    if (profile) {
+      loadAssignments()
+    }
+  }, [profile])
 
   const loadSubmissions = async (assignmentId: string) => {
     setSelectedAssignment(assignmentId)
@@ -35,9 +47,21 @@ export default function TeacherAssignmentsPage() {
   const handleCreate = async () => {
     if (!profile) return
     setSaving(true)
-    await supabase.from('assignments').insert({
-      ...form, created_by: profile.id, deadline: form.deadline || null, max_score: Number(form.max_score),
-    })
+    const { data: newAssignment, error } = await supabase
+      .from('assignments')
+      .insert({
+        ...form,
+        created_by: profile.id,
+        deadline: form.deadline || null,
+        max_score: Number(form.max_score),
+      })
+      .select()
+      .single()
+
+    if (newAssignment && !error) {
+      await notifyStudentsOfNewAssignment(supabase, newAssignment.title)
+    }
+
     setForm({ title: '', description: '', deadline: '', max_score: 100 })
     setShowForm(false)
     setSaving(false)
@@ -47,17 +71,18 @@ export default function TeacherAssignmentsPage() {
   const handleGrade = async () => {
     if (!grading || !profile) return
     setSaving(true)
+    const scoreVal = Number(grading.score)
     await supabase.from('assignment_submissions').update({
-      score: Number(grading.score), feedback: grading.feedback, graded_by: profile.id, graded_at: new Date().toISOString(),
+      score: scoreVal, feedback: grading.feedback, graded_by: profile.id, graded_at: new Date().toISOString(),
     }).eq('id', grading.id)
 
-    // Add XP to student
+    // Add XP to student, notify, and update creative score
     const sub = submissions.find(s => s.id === grading.id)
     if (sub) {
-      const { data: studentProfile } = await supabase.from('profiles').select('xp').eq('id', sub.student_id).single()
-      if (studentProfile) {
-        await supabase.from('profiles').update({ xp: studentProfile.xp + Number(grading.score) }).eq('id', sub.student_id)
-      }
+      await updateUserXP(supabase, sub.student_id, scoreVal)
+      const assignmentTitle = assignments.find(a => a.id === selectedAssignment)?.title || 'Тапсырма'
+      await notifyGraded(supabase, sub.student_id, assignmentTitle, scoreVal)
+      await calculateCreativeScore(supabase, sub.student_id)
     }
 
     setGrading(null)

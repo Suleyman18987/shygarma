@@ -1,8 +1,41 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
 import { BookOpen, Trophy, BarChart3, Gamepad2, ArrowRight, Star, Users, Award } from 'lucide-react'
 
 export default function LandingPage() {
+  const [supabase] = useState(() => createClient())
+  const [stats, setStats] = useState({ students: 0, olympiads: 0, projects: 0 })
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const { count: studentCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('role', 'student')
+        
+        const { count: olympiadCount } = await supabase
+          .from('olympiads')
+          .select('*', { count: 'exact', head: true })
+
+        const { count: projectCount } = await supabase
+          .from('projects')
+          .select('*', { count: 'exact', head: true })
+
+        setStats({
+          students: studentCount || 0,
+          olympiads: olympiadCount || 0,
+          projects: projectCount || 0
+        })
+      } catch (e) {
+        console.error('Error fetching landing page stats:', e)
+      }
+    }
+    loadStats()
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Navbar */}
@@ -52,9 +85,9 @@ export default function LandingPage() {
       <section className="px-6 lg:px-16 pb-16">
         <div className="max-w-4xl mx-auto grid grid-cols-3 gap-6">
           {[
-            { icon: Users, label: 'Оқушылар', value: '500+' },
-            { icon: Trophy, label: 'Олимпиадалар', value: '50+' },
-            { icon: Award, label: 'Жобалар', value: '100+' },
+            { icon: Users, label: 'Оқушылар', value: stats.students },
+            { icon: Trophy, label: 'Олимпиадалар', value: stats.olympiads },
+            { icon: Award, label: 'Жобалар', value: stats.projects },
           ].map((s, i) => (
             <div key={i} className="bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center hover:shadow-md transition-shadow">
               <s.icon className="w-8 h-8 mx-auto text-[#4F46E5] mb-3" />

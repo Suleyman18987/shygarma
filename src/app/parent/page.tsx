@@ -9,6 +9,8 @@ export default function ParentDashboard() {
   const [supabase] = useState(() => createClient())
   const [child, setChild] = useState<any>(null)
   const [grades, setGrades] = useState<any[]>([])
+  const [olympiadGrades, setOlympiadGrades] = useState<any[]>([])
+  const [projectGrades, setProjectGrades] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -22,15 +24,69 @@ export default function ParentDashboard() {
         .limit(1)
 
       if (children && children.length > 0) {
-        setChild(children[0])
+        const activeChild = children[0]
+        setChild(activeChild)
+
+        // 1. Fetch assignment grades
         const { data: subs } = await supabase
           .from('assignment_submissions')
           .select('*, assignments!inner(title)')
-          .eq('student_id', children[0].id)
+          .eq('student_id', activeChild.id)
           .not('score', 'is', null)
           .order('graded_at', { ascending: false })
           .limit(10)
         setGrades(subs || [])
+
+        // 2. Fetch olympiad submissions and match problem titles
+        const { data: oSubs } = await supabase
+          .from('olympiad_submissions')
+          .select('*')
+          .eq('student_id', activeChild.id)
+          .order('submitted_at', { ascending: false })
+
+        if (oSubs && oSubs.length > 0) {
+          const pIds = oSubs.map((s: any) => s.problem_id)
+          const { data: probs } = await supabase
+            .from('problems')
+            .select('id, title, points, olympiads(title)')
+            .in('id', pIds)
+          const mappedOSubs = oSubs.map((s: any) => {
+            const p = probs?.find((pr: any) => pr.id === s.problem_id) as any
+            const olympiadTitle = Array.isArray(p?.olympiads)
+              ? p?.olympiads[0]?.title
+              : p?.olympiads?.title
+            return {
+              ...s,
+              problem_title: p?.title || 'Есеп',
+              olympiad_title: olympiadTitle || 'Олимпиада',
+              max_points: p?.points || 10
+            }
+          })
+          setOlympiadGrades(mappedOSubs)
+        }
+
+        // 3. Fetch project submissions and match project titles
+        const { data: pSubs } = await supabase
+          .from('project_submissions')
+          .select('*')
+          .eq('student_id', activeChild.id)
+          .order('submitted_at', { ascending: false })
+
+        if (pSubs && pSubs.length > 0) {
+          const projIds = pSubs.map((s: any) => s.project_id)
+          const { data: projs } = await supabase
+            .from('projects')
+            .select('id, title')
+            .in('id', projIds)
+          const mappedPSubs = pSubs.map((s: any) => {
+            const pr = projs?.find((p: any) => p.id === s.project_id)
+            return {
+              ...s,
+              project_title: pr?.title || 'Жоба'
+            }
+          })
+          setProjectGrades(mappedPSubs)
+        }
       }
       setLoading(false)
     }
@@ -42,6 +98,30 @@ export default function ParentDashboard() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-[#0F172A] mb-6">Ата-ана панелі 👪</h1>
+
+      {profile && (
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 mb-6">
+          <h3 className="font-semibold text-[#0F172A] mb-2">Telegram хабарламалары 💬</h3>
+          <p className="text-sm text-[#64748B] mb-4">
+            Балаңыздың үлгерімі, алған бағалары мен жаңа тапсырмалар туралы жедел хабарламаларды Телеграм арқылы алып отырыңыз.
+          </p>
+          {profile.telegram_chat_id ? (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-xl border border-green-200">
+              <span>Телеграм сәтті қосылды</span>
+              <span className="font-bold">✅</span>
+            </div>
+          ) : (
+            <a
+              href={`https://t.me/DarynSpaceBot?start=${profile.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0088cc] hover:bg-[#0077b5] text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-[#0088cc]/10"
+            >
+              💬 Телеграм ботқа қосылу
+            </a>
+          )}
+        </div>
+      )}
 
       {child ? (
         <>
@@ -55,18 +135,63 @@ export default function ParentDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
+          <div className="grid md:grid-cols-2 gap-6 mt-6">
+            {/* Assignments */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#E2E8F0]">
+                <h2 className="font-semibold text-[#0F172A]">Тапсырма бағалары 📝</h2>
+              </div>
+              <div className="divide-y divide-[#E2E8F0]">
+                {grades.map(g => (
+                  <div key={g.id} className="px-6 py-3 flex items-center justify-between">
+                    <span className="text-sm text-[#0F172A]">{g.assignments?.title}</span>
+                    <span className="text-sm font-semibold text-[#4F46E5]">{g.score} балл</span>
+                  </div>
+                ))}
+                {grades.length === 0 && <div className="px-6 py-8 text-center text-sm text-[#94A3B8]">Бағалар жоқ</div>}
+              </div>
+            </div>
+
+            {/* Projects */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#E2E8F0]">
+                <h2 className="font-semibold text-[#0F172A]">Жобалар нәтижесі 🎨</h2>
+              </div>
+              <div className="divide-y divide-[#E2E8F0]">
+                {projectGrades.map(p => (
+                  <div key={p.id} className="px-6 py-3 flex items-center justify-between">
+                    <span className="text-sm text-[#0F172A]">{p.project_title}</span>
+                    <span className="text-sm font-semibold text-[#7C3AED]">
+                      {p.total_score !== null ? `${p.total_score} балл` : 'Бағаланбады'}
+                    </span>
+                  </div>
+                ))}
+                {projectGrades.length === 0 && <div className="px-6 py-8 text-center text-sm text-[#94A3B8]">Жобалар жоқ</div>}
+              </div>
+            </div>
+          </div>
+
+          {/* Olympiads */}
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden mt-6">
             <div className="px-6 py-4 border-b border-[#E2E8F0]">
-              <h2 className="font-semibold text-[#0F172A]">Соңғы бағалар</h2>
+              <h2 className="font-semibold text-[#0F172A]">Олимпиада нәтижелері 🏆</h2>
             </div>
             <div className="divide-y divide-[#E2E8F0]">
-              {grades.map(g => (
-                <div key={g.id} className="px-6 py-3 flex items-center justify-between">
-                  <span className="text-sm text-[#0F172A]">{g.assignments?.title}</span>
-                  <span className="text-sm font-semibold text-[#4F46E5]">{g.score} балл</span>
+              {olympiadGrades.map(o => (
+                <div key={o.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-[#0F172A]">{o.olympiad_title}</div>
+                    <div className="text-xs text-[#64748B] mt-0.5">Есеп: {o.problem_title}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {o.is_correct === true && <span className="text-xs px-2.5 py-1 bg-green-50 text-green-700 rounded-lg font-medium border border-green-200">Дұрыс</span>}
+                    {o.is_correct === false && <span className="text-xs px-2.5 py-1 bg-red-50 text-red-700 rounded-lg font-medium border border-red-200">Қате</span>}
+                    {o.is_correct === null && <span className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg font-medium border border-blue-200">Тексерілуде</span>}
+                    <span className="text-sm font-bold text-[#0F172A]">{o.score} / {o.max_points} XP</span>
+                  </div>
                 </div>
               ))}
-              {grades.length === 0 && <div className="px-6 py-8 text-center text-sm text-[#94A3B8]">Бағалар жоқ</div>}
+              {olympiadGrades.length === 0 && <div className="px-6 py-8 text-center text-sm text-[#94A3B8]">Олимпиадаларға қатысу жоқ</div>}
             </div>
           </div>
         </>

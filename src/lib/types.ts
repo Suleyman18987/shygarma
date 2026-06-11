@@ -9,6 +9,7 @@ export interface Profile {
   level: number
   creative_score: number
   parent_id: string | null
+  telegram_chat_id?: number | null
   created_at: string
 }
 
@@ -28,7 +29,7 @@ export interface Problem {
   olympiad_id: string
   title: string
   description: string | null
-  type: 'test' | 'short_answer' | 'creative'
+  type: 'test' | 'short_answer' | 'creative' | 'code'
   points: number
   options: { text: string; correct: boolean }[] | null
   correct_answer: string | null

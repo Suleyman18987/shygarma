@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Plus, Loader2, Link2 } from 'lucide-react'
+import { updateUserXP } from '@/lib/xp-utils'
+import { notifyGraded } from '@/lib/notification-utils'
+import { calculateCreativeScore } from '@/lib/creative-score'
 
 export default function TeacherProjectsPage() {
   const { profile } = useAuth()
@@ -16,10 +19,19 @@ export default function TeacherProjectsPage() {
   const [grading, setGrading] = useState<any>(null)
 
   const load = async () => {
-    const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
+    if (!profile) return
+    const { data } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('created_by', profile.id)
+      .order('created_at', { ascending: false })
     setProjects(data || [])
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (profile) {
+      load()
+    }
+  }, [profile])
 
   const loadSubs = async (pid: string) => {
     setSelectedProject(pid)
@@ -42,15 +54,15 @@ export default function TeacherProjectsPage() {
     
     const sub = submissions.find(s => s.id === grading.id)
     if (sub) {
-      const { data: studentProfile } = await supabase.from('profiles').select('xp, creative_score').eq('id', sub.student_id).single()
-      if (studentProfile) {
-        const newXp = studentProfile.xp + total
-        const creativeBonus = (grading.scores['Креативтілік'] || 0) * 2
-        await supabase.from('profiles').update({ 
-          xp: newXp, 
-          creative_score: (studentProfile.creative_score || 0) + creativeBonus 
-        }).eq('id', sub.student_id)
-      }
+      // 1. Add XP + check levels/badges via updateUserXP
+      await updateUserXP(supabase, sub.student_id, total)
+
+      // 2. Notify student & parent of grade
+      const projectTitle = projects.find(p => p.id === selectedProject)?.title || 'Жоба'
+      await notifyGraded(supabase, sub.student_id, projectTitle, total)
+
+      // 3. Recalculate Creative Score (which updates creative_score in profiles)
+      await calculateCreativeScore(supabase, sub.student_id)
     }
 
     setGrading(null); setSaving(false)
