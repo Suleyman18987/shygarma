@@ -5,12 +5,16 @@ import { useAuth } from '@/lib/auth-context'
 import { BarChart3, Target, Award } from 'lucide-react'
 
 export default function StudentProgressPage() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [supabase] = useState(() => createClient())
   const [badges, setBadges] = useState<any[]>([])
   const [stats, setStats] = useState({ olympiadSubs: 0, assignmentSubs: 0, projectSubs: 0, correctAnswers: 0 })
   const [certificates, setCertificates] = useState<any[]>([])
   const [selectedCert, setSelectedCert] = useState<any | null>(null)
+
+  useEffect(() => {
+    refreshProfile()
+  }, [])
 
   useEffect(() => {
     const load = async () => {

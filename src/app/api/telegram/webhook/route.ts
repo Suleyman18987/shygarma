@@ -135,34 +135,53 @@ export async function POST(req: Request) {
       await sendTelegramMessage(chatId, textResponse, mainKeyboard)
 
     } else if (messageText === "📈 Үлгерім графигі") {
-      // 1. Fetch assignment grades average
+      // 1. Fetch assignment grades average (accounts for assignment max_score)
       const { data: assignments } = await supabase
         .from('assignment_submissions')
-        .select('score')
+        .select('score, assignments(max_score)')
         .eq('student_id', child.id)
         .not('score', 'is', null)
-      const avgAssignments = assignments && assignments.length > 0
-        ? (assignments.reduce((acc, curr) => acc + (curr.score || 0), 0) / assignments.length)
-        : 0
+      
+      let avgAssignments = 0
+      if (assignments && assignments.length > 0) {
+        let totalPct = 0
+        assignments.forEach((sub: any) => {
+          const maxScore = sub.assignments?.max_score || 100
+          totalPct += ((sub.score || 0) / maxScore) * 100
+        })
+        avgAssignments = totalPct / assignments.length
+      }
 
-      // 2. Fetch project grades average
+      // 2. Fetch project grades average (out of 50 max score)
       const { data: projects } = await supabase
         .from('project_submissions')
         .select('total_score')
         .eq('student_id', child.id)
         .not('total_score', 'is', null)
-      const avgProjects = projects && projects.length > 0
-        ? (projects.reduce((acc, curr) => acc + (curr.total_score || 0), 0) / projects.length)
-        : 0
+      
+      let avgProjects = 0
+      if (projects && projects.length > 0) {
+        const sum = projects.reduce((acc, curr) => acc + (curr.total_score || 0), 0)
+        avgProjects = ((sum / projects.length) / 50) * 100
+      }
 
-      // 3. Fetch olympiad grades average (Olympiad problem points are out of 10)
+      // 3. Fetch olympiad grades average (accounts for actual problem points)
       const { data: olympiads } = await supabase
         .from('olympiad_submissions')
-        .select('score')
+        .select('score, problems(points)')
         .eq('student_id', child.id)
-      const avgOlympiads = olympiads && olympiads.length > 0
-        ? (olympiads.reduce((acc, curr) => acc + (curr.score || 0), 0) / olympiads.length) * 10
-        : 0
+      
+      let avgOlympiads = 0
+      if (olympiads && olympiads.length > 0) {
+        let totalScored = 0
+        let totalPossible = 0
+        olympiads.forEach((sub: any) => {
+          const maxPoints = sub.problems?.points ?? 10
+          totalScored += sub.score || 0
+          totalPossible += maxPoints
+        })
+        avgOlympiads = totalPossible > 0 ? (totalScored / totalPossible) * 100 : 0
+      }
 
       // Generate Chart.js configurations for QuickChart
       const chartConfig = {

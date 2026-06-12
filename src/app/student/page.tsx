@@ -6,12 +6,13 @@ import { Trophy, ClipboardList, FolderKanban, Zap, Target, Medal } from 'lucide-
 import Link from 'next/link'
 
 export default function StudentDashboard() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [supabase] = useState(() => createClient())
   const [stats, setStats] = useState({ olympiads: 0, assignments: 0, projects: 0 })
   const [upcoming, setUpcoming] = useState<any[]>([])
 
   useEffect(() => {
+    refreshProfile()
     const load = async () => {
       const [o, a, p] = await Promise.all([
         supabase.from('olympiads').select('id', { count: 'exact', head: true }).eq('status', 'active'),
