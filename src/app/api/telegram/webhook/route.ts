@@ -208,7 +208,7 @@ export async function POST(req: Request) {
         }
       }
 
-      const chartUrl = `https://quickchart.io/chart?w=500&h=300&c=${encodeURIComponent(JSON.stringify(chartConfig))}`
+      const chartUrl = `https://quickchart.io/chart?w=500&h=300&c=${encodeURIComponent(JSON.stringify(chartConfig))}&b=${Date.now()}`
       
       const caption = `📊 <b>${child.full_name}</b> оқушының үлгерім көрсеткіштері.\n\n` +
         `• Үй тапсырмасы орташа: <b>${Math.round(avgAssignments)}%</b>\n` +

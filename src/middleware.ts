@@ -54,31 +54,38 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (!profile) {
+    if (error) {
+      console.error('Middleware profile fetch error:', error)
+      if (error.code === 'PGRST116') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        return NextResponse.redirect(url)
+      }
+    } else if (!profile) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
-    }
+    } else {
+      const role = profile.role
 
-    const role = profile.role
-
-    if (pathname.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL(`/${role}`, request.url))
-    }
-    if (pathname.startsWith('/teacher') && role !== 'teacher') {
-      return NextResponse.redirect(new URL(`/${role}`, request.url))
-    }
-    if (pathname.startsWith('/student') && role !== 'student') {
-      return NextResponse.redirect(new URL(`/${role}`, request.url))
-    }
-    if (pathname.startsWith('/parent') && role !== 'parent') {
-      return NextResponse.redirect(new URL(`/${role}`, request.url))
+      if (pathname.startsWith('/admin') && role !== 'admin') {
+        return NextResponse.redirect(new URL(`/${role}`, request.url))
+      }
+      if (pathname.startsWith('/teacher') && role !== 'teacher') {
+        return NextResponse.redirect(new URL(`/${role}`, request.url))
+      }
+      if (pathname.startsWith('/student') && role !== 'student') {
+        return NextResponse.redirect(new URL(`/${role}`, request.url))
+      }
+      if (pathname.startsWith('/parent') && role !== 'parent') {
+        return NextResponse.redirect(new URL(`/${role}`, request.url))
+      }
     }
   }
 
