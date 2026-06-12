@@ -59,11 +59,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true })
       }
 
-      // Link the parent profile (parent_id) to this telegram chat id
+      // Link the parent profile (parent_id) to this telegram chat id using RPC
       const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ telegram_chat_id: chatId })
-        .eq('id', student.parent_id)
+        .rpc('link_parent_telegram', { parent_uuid: student.parent_id, chat_id: chatId })
 
       if (updateError) {
         console.error('Webhook link error:', updateError)
