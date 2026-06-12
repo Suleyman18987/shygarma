@@ -7,6 +7,37 @@ interface Message {
   content: string
 }
 
+function prepareContents(messagesList: Message[]) {
+  // Gemini requires the conversation to start with 'user' role
+  let startIndex = 0
+  while (startIndex < messagesList.length && messagesList[startIndex].role !== 'user') {
+    startIndex++
+  }
+
+  const filtered = messagesList.slice(startIndex)
+  if (filtered.length === 0) {
+    return []
+  }
+
+  // Gemini requires strictly alternating roles ('user' and 'model')
+  const result: any[] = []
+  for (const msg of filtered) {
+    const role = msg.role === 'assistant' ? 'model' : 'user'
+    
+    if (result.length > 0 && result[result.length - 1].role === role) {
+      // Merge consecutive messages of the same role
+      result[result.length - 1].parts[0].text += '\n\n' + msg.content
+    } else {
+      result.push({
+        role,
+        parts: [{ text: msg.content }]
+      })
+    }
+  }
+
+  return result
+}
+
 export default function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -51,13 +82,14 @@ export default function AIAssistant() {
         const clientApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''
         
         if (!clientApiKey) {
-          throw new Error('ИИ кілті теңшелінбеген')
+          throw new Error('ИИ кілті теңшелінбеген (Сайтты қайта жинау қажет болуы мүмкін)')
         }
 
-        const contents = newMessages.map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-        }))
+        const contents = prepareContents(newMessages)
+        if (contents.length === 0) {
+          throw new Error('Жіберілетін мәлімет табылмады')
+        }
+
         const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Жауаптарыңды қазақ тілінде бер. Мұғалімдерге және оқушыларға олимпиада және жоба жұмыстары бойынша көмектес. Қысқа және нақты жауап бер.'
 
         const clientResponse = await fetch(
@@ -75,7 +107,10 @@ export default function AIAssistant() {
         )
 
         if (!clientResponse.ok) {
-          throw new Error('Сұранысты орындау мүмкін болмады (Сервер және клиент шектеулі)')
+          const errData = await clientResponse.json().catch(() => ({}))
+          const errMsg = errData.error?.message || clientResponse.statusText
+          console.error('Gemini direct API error:', errData)
+          throw new Error(`Сұраныс сәтсіз аяқталды: ${errMsg}`)
         }
 
         const data = await clientResponse.json()
@@ -93,14 +128,15 @@ export default function AIAssistant() {
           throw new Error('ИИ кілті теңшелінбеген')
         }
 
-        const contents = newMessages.map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-        }))
+        const contents = prepareContents(newMessages)
+        if (contents.length === 0) {
+          throw new Error('Жіберілетін мәлімет табылмады')
+        }
+
         const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Жауаптарыңды қазақ тілінде бер.'
 
         const backupResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${clientApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${clientApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -114,16 +150,20 @@ export default function AIAssistant() {
         )
 
         if (!backupResponse.ok) {
-          throw new Error('Сұраныс қабылданбады')
+          const errData = await backupResponse.json().catch(() => ({}))
+          const errMsg = errData.error?.message || backupResponse.statusText
+          console.error('Gemini fallback API error:', errData)
+          throw new Error(`Сұраныс сәтсіз аяқталды: ${errMsg}`)
         }
 
         const data = await backupResponse.json()
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
         setMessages((prev) => [...prev, { role: 'assistant', content: aiText }])
-      } catch (innerError) {
+      } catch (innerError: any) {
+        console.error('AI assistant component error:', error, innerError)
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: `Қате орын алды: ${error.message || 'Сервер жауап бермеді.'}` }
+          { role: 'assistant', content: `Қате орын алды: ${innerError.message || error.message || 'Сервер жауап бермеді.'}` }
         ])
       }
     } finally {
