@@ -19,7 +19,7 @@ export default function TeacherAssignmentsPage() {
   const [grading, setGrading] = useState<{ id: string; score: string; feedback: string } | null>(null)
 
   const [showAIPanel, setShowAIPanel] = useState(false)
-  const [aiInputs, setAiInputs] = useState({ subject: 'Математика', grade: '8', difficulty: 'Орташа', type: 'test' })
+  const [aiInputs, setAiInputs] = useState({ subject: 'Математика', grade: '8', difficulty: 'Орташа', type: 'test', topic: '' })
   const [generatingAI, setGeneratingAI] = useState(false)
   const [aiError, setAiError] = useState('')
 
@@ -232,7 +232,18 @@ export default function TeacherAssignmentsPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-1">
+              <div className="mt-3">
+                <label className="text-[10px] font-bold text-[#64748B] block mb-1">Тақырып немесе бағыты (мысалы: Квадрат теңдеулер, Экология)</label>
+                <input
+                  type="text"
+                  placeholder="Генерацияланатын тапсырма тақырыбын енгізіңіз (міндетті емес)"
+                  value={aiInputs.topic}
+                  onChange={e => setAiInputs(a => ({ ...a, topic: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
                 <button
                   onClick={generateWithAI}
                   disabled={generatingAI}

@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
-    const { subject, grade, difficulty, type } = await req.json()
+    const { subject, grade, difficulty, type, topic } = await req.json()
     const apiKey = process.env.GEMINI_API_KEY
 
     if (!apiKey) {
       return NextResponse.json({ error: 'Gemini API key is not configured' }, { status: 500 })
     }
 
-    const prompt = `Сынып: ${grade}, Пән: ${subject}, Қиындық деңгейі: ${difficulty}, Тапсырма типі: ${type}.
+    const prompt = `Сынып: ${grade}, Пән: ${subject}, Қиындық деңгейі: ${difficulty}, Тапсырма типі: ${type}.${topic ? ` Тапсырма тақырыбы немесе бағыты: ${topic}.` : ''}
 Осы параметрлерге сәйкес қазақ тілінде білім беру тапсырмасын жаса.
 Тапсырма форматы JSON түрінде келесі құрылыммен болуы керек:
 {

@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { Sparkles, X, Send, Loader2, ArrowLeft, MessageSquare, Trash2, Plus, History } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, ArrowLeft, MessageSquare, Trash2, Plus, History, Pencil, Check } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -45,6 +45,61 @@ function prepareContents(messagesList: Message[]) {
   return result
 }
 
+function formatMathText(mathStr: string): string {
+  let html = mathStr;
+  
+  // Replace fractions
+  while (html.includes('\\frac{')) {
+    const match = html.match(/\\frac{([^}]+)}{([^}]+)}/);
+    if (!match) break;
+    html = html.replace(/\\frac{([^}]+)}{([^}]+)}/, 
+      `<span class="inline-flex flex-col text-center align-middle mx-1 text-[0.85em] leading-none"><span class="border-b border-current pb-0.5">$1</span><span class="pt-0.5">$2</span></span>`
+    );
+  }
+
+  // Replace square roots
+  while (html.includes('\\sqrt{')) {
+    html = html.replace(/\\sqrt{([^}]+)}/g, '<span class="font-serif">√</span><span class="border-t border-current pl-0.5">$1</span>');
+  }
+
+  // Replace symbols
+  const symbols: Record<string, string> = {
+    '\\pm': '±',
+    '\\Delta': 'Δ',
+    '\\cdot': '·',
+    '\\times': '×',
+    '\\leq': '≤',
+    '\\le': '≤',
+    '\\geq': '≥',
+    '\\ge': '≥',
+    '\\neq': '≠',
+    '\\alpha': 'α',
+    '\\beta': 'β',
+    '\\gamma': 'γ',
+    '\\pi': 'π',
+    '\\infty': '∞',
+    '\\approx': '≈',
+    '\\to': '→',
+    '\\rightarrow': '→',
+    '\\*' : '·'
+  };
+
+  Object.entries(symbols).forEach(([latex, unicode]) => {
+    const escaped = latex.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    html = html.replace(new RegExp(escaped, 'g'), unicode);
+  });
+
+  // Replace superscripts
+  html = html.replace(/\^{([^}]+)}/g, '<sup>$1</sup>');
+  html = html.replace(/\^([a-zA-Z0-9\-+]+)/g, '<sup>$1</sup>');
+
+  // Replace subscripts
+  html = html.replace(/_{([^}]+)}/g, '<sub>$1</sub>');
+  html = html.replace(/_([a-zA-Z0-9\-+]+)/g, '<sub>$1</sub>');
+
+  return html;
+}
+
 function parseMarkdown(text: string, isUser: boolean = false) {
   const parts = text.split(/(```[\s\S]*?```)/g)
 
@@ -85,30 +140,64 @@ function parseMarkdown(text: string, isUser: boolean = false) {
             trimmed = trimmed.replace(/^\d+\.\s+/, '')
           }
 
-          const inlineParts = trimmed.split(/(`[^`]+`)/g)
-          const formattedLine = inlineParts.map((subPart, subIdx) => {
-            if (subPart.startsWith('`') && subPart.endsWith('`')) {
+          // Split line by block and inline math delimiters
+          const lineParts = trimmed.split(/(\$\$[\s\S]*?\$\$|\$[^\$]+\$)/g)
+
+          const formattedLine = lineParts.map((subPart, partIdx) => {
+            if (subPart.startsWith('$$') && subPart.endsWith('$$')) {
+              const mathContent = subPart.slice(2, -2)
               return (
-                <code key={subIdx} className={`px-1.5 py-0.5 rounded-md font-mono text-xs border ${
-                  isUser 
-                    ? 'bg-[#4338CA] text-white border-[#3730A3]' 
-                    : 'bg-[#EEF2FF] text-[#4F46E5] border-[#E2E8F0]'
-                }`}>
-                  {subPart.slice(1, -1)}
-                </code>
+                <span
+                  key={partIdx}
+                  className={`block text-center my-2 font-serif overflow-x-auto select-all ${
+                    isUser ? 'text-white' : 'text-[#0F172A]'
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: formatMathText(mathContent) }}
+                />
               )
             }
 
-            const boldParts = subPart.split(/(\*\*[^*]+\*\*)/g)
-            return boldParts.map((boldPart, boldIdx) => {
-              if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+            if (subPart.startsWith('$') && subPart.endsWith('$')) {
+              const mathContent = subPart.slice(1, -1)
+              return (
+                <span
+                  key={partIdx}
+                  className={`font-serif italic mx-0.5 px-1 rounded select-all ${
+                    isUser 
+                      ? 'bg-indigo-900/40 border border-indigo-700/50 text-white' 
+                      : 'bg-slate-50 border border-slate-200 text-[#0F172A]'
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: formatMathText(mathContent) }}
+                />
+              )
+            }
+
+            // Apply inline formatting to non-math text
+            const inlineParts = subPart.split(/(`[^`]+`)/g)
+            return inlineParts.map((inlinePart, subIdx) => {
+              if (inlinePart.startsWith('`') && inlinePart.endsWith('`')) {
                 return (
-                  <strong key={boldIdx} className={`font-extrabold ${isUser ? 'text-white' : 'text-[#0F172A]'}`}>
-                    {boldPart.slice(2, -2)}
-                  </strong>
+                  <code key={subIdx} className={`px-1.5 py-0.5 rounded-md font-mono text-xs border ${
+                    isUser 
+                      ? 'bg-[#4338CA] text-white border-[#3730A3]' 
+                      : 'bg-[#EEF2FF] text-[#4F46E5] border-[#E2E8F0]'
+                  }`}>
+                    {inlinePart.slice(1, -1)}
+                  </code>
                 )
               }
-              return boldPart
+
+              const boldParts = inlinePart.split(/(\*\*[^*]+\*\*)/g)
+              return boldParts.map((boldPart, boldIdx) => {
+                if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+                  return (
+                    <strong key={boldIdx} className={`font-extrabold ${isUser ? 'text-white' : 'text-[#0F172A]'}`}>
+                      {boldPart.slice(2, -2)}
+                    </strong>
+                  )
+                }
+                return boldPart
+              })
             })
           })
 
@@ -151,6 +240,24 @@ export default function AIAssistant() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+
+  const renameChat = (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return
+    setSessions(prev => {
+      const next = prev.map(s => {
+        if (s.id === id) {
+          return { ...s, title: newTitle.trim() }
+        }
+        return s
+      })
+      localStorage.setItem('daryn_ai_sessions', JSON.stringify(next))
+      return next
+    })
+    setEditingSessionId(null)
+  }
 
   // Load chat sessions from localStorage on mount
   useEffect(() => {
@@ -232,6 +339,35 @@ export default function AIAssistant() {
     }
   }
 
+  const updateActiveSession = (newMessages: Message[], customTitle?: string) => {
+    setSessions(prev => {
+      const next = prev.map(s => {
+        if (s.id === activeSessionId) {
+          const isDefaultTitle = 
+            s.title === 'Жаңа диалог' || 
+            s.title === 'Новый чат' || 
+            s.title === 'New Chat' || 
+            s.title === 'Жаңа чат' ||
+            s.title.startsWith('Жаңа') ||
+            s.title.startsWith('Новый')
+          const firstUserMsg = newMessages.find(m => m.role === 'user')?.content || ''
+          const title = customTitle || (isDefaultTitle && firstUserMsg 
+            ? (firstUserMsg.length > 25 ? firstUserMsg.substring(0, 25) + '...' : firstUserMsg) 
+            : s.title)
+          return {
+            ...s,
+            title,
+            messages: newMessages,
+            updatedAt: Date.now()
+          }
+        }
+        return s
+      })
+      localStorage.setItem('daryn_ai_sessions', JSON.stringify(next))
+      return next
+    })
+  }
+
   const handleSend = async (textToSend?: string) => {
     const messageContent = (textToSend || input).trim()
     if (!messageContent || loading || !activeSessionId) return
@@ -242,20 +378,8 @@ export default function AIAssistant() {
 
     const updatedMessages: Message[] = [...messages, { role: 'user', content: messageContent }]
     
-    // Update active session locally
-    let updatedSessions = sessions.map(s => {
-      if (s.id === activeSessionId) {
-        const isDefaultTitle = s.title === 'Жаңа диалог'
-        return {
-          ...s,
-          title: isDefaultTitle ? (messageContent.length > 25 ? messageContent.substring(0, 25) + '...' : messageContent) : s.title,
-          messages: updatedMessages,
-          updatedAt: Date.now()
-        }
-      }
-      return s
-    })
-    saveSessions(updatedSessions)
+    // Update active session locally (user message)
+    updateActiveSession(updatedMessages)
     setLoading(true)
 
     try {
@@ -305,31 +429,12 @@ export default function AIAssistant() {
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
         
         // Save reply
-        const finalSessions = sessions.map(s => {
-          if (s.id === activeSessionId) {
-            return {
-              ...s,
-              messages: [...updatedMessages, { role: 'assistant' as const, content: aiText }],
-              updatedAt: Date.now()
-            }
-          }
-          return s
-        })
-        saveSessions(finalSessions)
+        updateActiveSession([...updatedMessages, { role: 'assistant' as const, content: aiText }])
       } else {
         const data = await response.json()
         
-        const finalSessions = sessions.map(s => {
-          if (s.id === activeSessionId) {
-            return {
-              ...s,
-              messages: [...updatedMessages, { role: 'assistant' as const, content: data.response }],
-              updatedAt: Date.now()
-            }
-          }
-          return s
-        })
-        saveSessions(finalSessions)
+        // Save reply
+        updateActiveSession([...updatedMessages, { role: 'assistant' as const, content: data.response }])
       }
     } catch (error: any) {
       try {
@@ -370,30 +475,12 @@ export default function AIAssistant() {
         const data = await backupResponse.json()
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
         
-        const finalSessions = sessions.map(s => {
-          if (s.id === activeSessionId) {
-            return {
-              ...s,
-              messages: [...updatedMessages, { role: 'assistant' as const, content: aiText }],
-              updatedAt: Date.now()
-            }
-          }
-          return s
-        })
-        saveSessions(finalSessions)
+        // Save reply
+        updateActiveSession([...updatedMessages, { role: 'assistant' as const, content: aiText }])
       } catch (innerError: any) {
         console.error('AI assistant component error:', error, innerError)
-        const finalSessions = sessions.map(s => {
-          if (s.id === activeSessionId) {
-            return {
-              ...s,
-              messages: [...updatedMessages, { role: 'assistant' as const, content: `Қате орын алды: ${innerError.message || error.message || 'Сервер жауап бермеді.'}` }],
-              updatedAt: Date.now()
-            }
-          }
-          return s
-        })
-        saveSessions(finalSessions)
+        // Save error message
+        updateActiveSession([...updatedMessages, { role: 'assistant' as const, content: `Қате орын алды: ${innerError.message || error.message || 'Сервер жауап бермеді.'}` }])
       }
     } finally {
       setLoading(false)
@@ -494,6 +581,49 @@ export default function AIAssistant() {
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2.5">
               {sessions.map(s => {
                 const isActive = s.id === activeSessionId
+                const isEditing = s.id === editingSessionId
+
+                if (isEditing) {
+                  return (
+                    <div
+                      key={s.id}
+                      className={`p-2 rounded-xl border transition-all flex items-center justify-between ${
+                        isActive 
+                          ? 'bg-[#EEF2FF] border-[#818CF8] shadow-sm' 
+                          : 'bg-white border-[#E2E8F0]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1 mr-2" onClick={(e) => e.stopPropagation()}>
+                        <MessageSquare className="w-4 h-4 text-[#4F46E5] shrink-0" />
+                        <input
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onBlur={() => renameChat(s.id, editingTitle)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              renameChat(s.id, editingTitle)
+                            } else if (e.key === 'Escape') {
+                              setEditingSessionId(null)
+                            }
+                          }}
+                          autoFocus
+                          className="w-full px-2.5 py-1.5 bg-white border border-[#818CF8] rounded-lg text-sm text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+                        />
+                      </div>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => renameChat(s.id, editingTitle)}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-all flex items-center justify-center"
+                          title="Сақтау"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                }
+
                 return (
                   <div
                     key={s.id}
@@ -507,20 +637,32 @@ export default function AIAssistant() {
                         : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
                       <MessageSquare className={`w-4 h-4 ${isActive ? 'text-[#4F46E5]' : 'text-[#94A3B8]'}`} />
                       <div className="truncate text-sm font-medium text-[#0F172A]">
                         {s.title}
                       </div>
                     </div>
                     
-                    <button
-                      onClick={(e) => deleteChat(s.id, e)}
-                      className="p-1.5 text-[#94A3B8] hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                      title="Диалогты өшіру"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => {
+                          setEditingSessionId(s.id)
+                          setEditingTitle(s.title)
+                        }}
+                        className="p-1.5 text-[#94A3B8] hover:text-[#4F46E5] hover:bg-[#EEF2FF] rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all flex items-center justify-center"
+                        title="Атауын өзгерту"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => deleteChat(s.id, e)}
+                        className="p-1.5 text-[#94A3B8] hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all flex items-center justify-center"
+                        title="Диалогты өшіру"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )
               })}

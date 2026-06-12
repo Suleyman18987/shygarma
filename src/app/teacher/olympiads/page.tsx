@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Plus, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Loader2, Trash2, Sparkles } from 'lucide-react'
 
 export default function TeacherOlympiadsPage() {
   const { profile } = useAuth()
@@ -15,6 +15,53 @@ export default function TeacherOlympiadsPage() {
   const [saving, setSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [existingProblems, setExistingProblems] = useState<any[]>([])
+
+  const [showAIPanel, setShowAIPanel] = useState(false)
+  const [aiInputs, setAiInputs] = useState({ subject: 'Математика', grade: '8', difficulty: 'Орташа', type: 'test', topic: '' })
+  const [generatingAI, setGeneratingAI] = useState(false)
+  const [aiError, setAiError] = useState('')
+
+  const generateProblemWithAI = async () => {
+    setGeneratingAI(true)
+    setAiError('')
+    try {
+      const response = await fetch('/api/ai/generate-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aiInputs)
+      })
+
+      if (!response.ok) {
+        throw new Error('ЖИ тапсырма генерациялай алмады. Сервер қатесі.')
+      }
+
+      const data = await response.json()
+      if (data.task) {
+        let optionsStr = ''
+        if (data.task.options && data.task.options.length > 0) {
+          const correctOpt = data.task.options.find((o: any) => o.correct)?.text || ''
+          const otherOpts = data.task.options.filter((o: any) => !o.correct).map((o: any) => o.text)
+          optionsStr = [correctOpt, ...otherOpts].filter(Boolean).join(', ')
+        }
+
+        setPForm({
+          title: data.task.title || '',
+          description: data.task.description || '',
+          type: aiInputs.type,
+          points: data.task.points || 10,
+          options: optionsStr,
+          correct_answer: data.task.correctAnswer || ''
+        })
+        setShowAIPanel(false)
+      } else {
+        throw new Error('Қайтарылған тапсырма құрылымы қате.')
+      }
+    } catch (err: any) {
+      setAiError(err.message || 'Белгісіз қате шықты.')
+    } finally {
+      setGeneratingAI(false)
+    }
+  }
 
   const load = async () => {
     const { data } = await supabase.from('olympiads').select('*').order('created_at', { ascending: false })
@@ -64,8 +111,126 @@ export default function TeacherOlympiadsPage() {
             <div className="flex-1"><label className="text-xs text-[#64748B]">Аяқталуы</label><input type="datetime-local" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" /></div>
           </div>
           <hr className="border-[#E2E8F0]" />
-          <h3 className="font-semibold text-sm text-[#0F172A]">Есептер ({problems.length})</h3>
-          <div className="space-y-2">
+          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2 mt-4">
+            <h3 className="font-semibold text-sm text-[#0F172A]">Есептер ({problems.length})</h3>
+            <button
+              type="button"
+              onClick={() => setShowAIPanel(!showAIPanel)}
+              className="text-xs font-semibold text-[#4F46E5] bg-[#EEF2FF] hover:bg-[#E0E7FF] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> {showAIPanel ? 'Қолмен жазу режимі' : 'ЖИ көмегімен жасау'}
+            </button>
+          </div>
+
+          {showAIPanel && (
+            <div className="bg-gradient-to-r from-[#F5F3FF] to-[#EEF2FF] p-4 rounded-xl border border-[#DDD6FE] space-y-3 mt-2">
+              <div className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Жасанды Интеллектпен олимпиада есебін генерациялау</span>
+              </div>
+              
+              {aiError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2">
+                  {aiError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-[#64748B] block mb-1">Пән</label>
+                  <select
+                    value={aiInputs.subject}
+                    onChange={e => setAiInputs(a => ({ ...a, subject: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                  >
+                    <option value="Математика">Математика</option>
+                    <option value="Физика">Физика</option>
+                    <option value="Химия">Химия</option>
+                    <option value="Биология">Биология</option>
+                    <option value="География">География</option>
+                    <option value="Информатика">Информатика</option>
+                    <option value="Қазақ тілі">Қазақ тілі</option>
+                    <option value="Ағылшын тілі">Ағылшын тілі</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#64748B] block mb-1">Сынып</label>
+                  <select
+                    value={aiInputs.grade}
+                    onChange={e => setAiInputs(a => ({ ...a, grade: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                  >
+                    <option value="5">5-сынып</option>
+                    <option value="6">6-сынып</option>
+                    <option value="7">7-сынып</option>
+                    <option value="8">8-сынып</option>
+                    <option value="9">9-сынып</option>
+                    <option value="10">10-сынып</option>
+                    <option value="11">11-сынып</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#64748B] block mb-1">Қиындығы</label>
+                  <select
+                    value={aiInputs.difficulty}
+                    onChange={e => setAiInputs(a => ({ ...a, difficulty: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                  >
+                    <option value="Жеңіл">Жеңіл</option>
+                    <option value="Орташа">Орташа</option>
+                    <option value="Қиын">Қиын</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#64748B] block mb-1">Есеп түрі</label>
+                  <select
+                    value={aiInputs.type}
+                    onChange={e => setAiInputs(a => ({ ...a, type: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                  >
+                    <option value="test">Тест</option>
+                    <option value="short_answer">Қысқа жауап</option>
+                    <option value="creative">Шығармашылық</option>
+                    <option value="code">Код (Python)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="text-[10px] font-bold text-[#64748B] block mb-1">Тақырып немесе бағыты (мысалы: Квадрат теңдеулер, Алгоритмдер)</label>
+                <input
+                  type="text"
+                  placeholder="Генерацияланатын есеп тақырыбын енгізіңіз (міндетті емес)"
+                  value={aiInputs.topic}
+                  onChange={e => setAiInputs(a => ({ ...a, topic: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={generateProblemWithAI}
+                  disabled={generatingAI}
+                  className="px-4 py-2 bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] hover:from-[#4338CA] hover:to-[#6D28D9] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-md shadow-[#4F46E5]/10 disabled:opacity-60 transition-colors cursor-pointer"
+                >
+                  {generatingAI ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Генерациялануда...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Есеп генерациялау
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 mt-3">
             <input placeholder="Есеп атауы" value={pForm.title} onChange={e => setPForm(f => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" />
             <textarea placeholder="Шарт" value={pForm.description} onChange={e => setPForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm min-h-[50px]" />
             <div className="flex gap-2">

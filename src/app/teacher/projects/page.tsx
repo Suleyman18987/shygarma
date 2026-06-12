@@ -21,6 +21,7 @@ export default function TeacherProjectsPage() {
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGrade, setAiGrade] = useState('8')
+  const [aiSubject, setAiSubject] = useState('Математика')
   const [generatingAI, setGeneratingAI] = useState(false)
   const [aiError, setAiError] = useState('')
 
@@ -31,6 +32,7 @@ export default function TeacherProjectsPage() {
     try {
       const prompt = `Жоба тақырыбы бойынша жаңа жоба ұсынысын қазақ тілінде жаса.
 Бағыты немесе тақырыбы: "${aiPrompt}"
+Пән: "${aiSubject}"
 Сыныбы: "${aiGrade}"
 
 Тапсырма форматы JSON түрінде келесі құрылыммен болуы керек (тек таза JSON қайтар, басқа ештеңе жазба, ешқандай \`\`\`json белгілері керек емес):
@@ -160,16 +162,23 @@ export default function TeacherProjectsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-[#64748B] block mb-1">Жоба бағыты немесе тақырыбы</label>
-                  <input
-                    type="text"
-                    placeholder="Мысалы: Жасанды интеллектті білімде қолдану, Экология, Робототехника"
-                    value={aiPrompt}
-                    onChange={e => setAiPrompt(e.target.value)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-[#64748B] block mb-1">Пән</label>
+                  <select
+                    value={aiSubject}
+                    onChange={e => setAiSubject(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
-                  />
+                  >
+                    <option value="Математика">Математика</option>
+                    <option value="Физика">Физика</option>
+                    <option value="Химия">Химия</option>
+                    <option value="Биология">Биология</option>
+                    <option value="География">География</option>
+                    <option value="Информатика">Информатика</option>
+                    <option value="Қазақ тілі">Қазақ тілі</option>
+                    <option value="Ағылшын тілі">Ағылшын тілі</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-[#64748B] block mb-1">Сынып</label>
@@ -187,6 +196,17 @@ export default function TeacherProjectsPage() {
                     <option value="11">11-сынып</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="text-[10px] font-bold text-[#64748B] block mb-1">Жоба бағыты немесе тақырыбы</label>
+                <input
+                  type="text"
+                  placeholder="Мысалы: Жасанды интеллектті білімде қолдану, Экология, Робототехника"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#4F46E5] text-[#0F172A]"
+                />
               </div>
 
               <div className="flex justify-end pt-1">
