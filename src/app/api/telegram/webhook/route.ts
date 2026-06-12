@@ -32,15 +32,21 @@ export async function POST(req: Request) {
     if (codeMatch) {
       const shortId = codeMatch[1].toLowerCase()
       
-      // Find student whose ID starts with shortId
-      const { data: student, error: studentError } = await supabase
+      // Find all student profiles
+      const { data: students, error: studentError } = await supabase
         .from('profiles')
         .select('id, full_name, parent_id')
         .eq('role', 'student')
-        .like('id', `${shortId}%`)
-        .maybeSingle()
 
-      if (studentError || !student) {
+      if (studentError || !students) {
+        await sendTelegramMessage(chatId, '❌ <b>Қате:</b> Мәліметтерді алу мүмкін болмады.')
+        return NextResponse.json({ ok: true })
+      }
+
+      // Find the student matching the shortId
+      const student = students.find((s: any) => s.id.startsWith(shortId))
+
+      if (!student) {
         await sendTelegramMessage(chatId, '❌ <b>Қате:</b> Бұл код бойынша оқушы табылмады. Кодты дұрыс енгізгеніңізді тексеріңіз.')
         return NextResponse.json({ ok: true })
       }
