@@ -105,21 +105,44 @@ export default function ParentDashboard() {
           <p className="text-sm text-[#64748B] mb-4">
             Балаңыздың үлгерімі, алған бағалары мен жаңа тапсырмалар туралы жедел хабарламаларды Телеграм арқылы алып отырыңыз.
           </p>
-          {profile.telegram_chat_id ? (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-xl border border-green-200">
-              <span>Телеграм сәтті қосылды</span>
-              <span className="font-bold">✅</span>
-            </div>
-          ) : (
-            <a
-              href={`https://t.me/DarynSpaceBot?start=${profile.id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0088cc] hover:bg-[#0077b5] text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-[#0088cc]/10"
-            >
-              💬 Телеграм ботқа қосылу
-            </a>
-          )}
+          
+          <div className="space-y-4">
+            {profile.telegram_chat_id ? (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-xl border border-green-200">
+                <span>Телеграм сәтті қосылды</span>
+                <span className="font-bold">✅</span>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <a
+                  href="https://t.me/DarynSpaceBot"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0088cc] hover:bg-[#0077b5] text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-[#0088cc]/10"
+                >
+                  💬 Телеграм ботқа өту
+                </a>
+                
+                {child && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-[#64748B]">Баланың бірегей коды:</span>
+                    <code className="px-3 py-1.5 bg-[#F1F5F9] text-[#4F46E5] font-mono font-bold rounded-lg border border-[#E2E8F0] text-sm">
+                      DARYN-{child.id.substring(0, 8)}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`DARYN-${child.id.substring(0, 8)}`)
+                        alert('Код көшірілді! Оны Телеграм ботқа жіберіңіз.')
+                      }}
+                      className="px-3 py-1.5 bg-[#E0E7FF] hover:bg-[#C7D2FE] text-[#4F46E5] text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      Көшіру
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
