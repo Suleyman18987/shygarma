@@ -1,10 +1,17 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { Sparkles, X, Send, Loader2 } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, ArrowLeft, MessageSquare, Trash2, Plus, History } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
+}
+
+interface ChatSession {
+  id: string
+  title: string
+  messages: Message[]
+  updatedAt: number
 }
 
 function prepareContents(messagesList: Message[]) {
@@ -38,43 +45,224 @@ function prepareContents(messagesList: Message[]) {
   return result
 }
 
+function parseMarkdown(text: string, isUser: boolean = false) {
+  const parts = text.split(/(```[\s\S]*?```)/g)
+
+  return parts.map((part, index) => {
+    if (part.startsWith('```') && part.endsWith('```')) {
+      const content = part.slice(3, -3)
+      const lines = content.split('\n')
+      let code = content
+      if (lines.length > 1 && /^[a-zA-Z0-9_-]+$/.test(lines[0].trim())) {
+        code = lines.slice(1).join('\n')
+      }
+      return (
+        <pre key={index} className={`p-3 rounded-xl font-mono text-xs overflow-x-auto my-2 border whitespace-pre ${
+          isUser 
+            ? 'bg-[#312E81] text-[#E0E7FF] border-[#4338CA]' 
+            : 'bg-slate-50 text-[#0F172A] border-[#E2E8F0]'
+        }`}>
+          <code>{code.trim()}</code>
+        </pre>
+      )
+    }
+
+    const lines = part.split('\n')
+    return (
+      <div key={index} className="space-y-1">
+        {lines.map((line, lineIdx) => {
+          let trimmed = line.trim()
+          if (trimmed === '') {
+            return <div key={lineIdx} className="h-1.5" />
+          }
+          
+          const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ')
+          const isNumbered = /^\d+\.\s/.test(trimmed)
+
+          if (isBullet) {
+            trimmed = trimmed.replace(/^[\*\-]\s+/, '')
+          } else if (isNumbered) {
+            trimmed = trimmed.replace(/^\d+\.\s+/, '')
+          }
+
+          const inlineParts = trimmed.split(/(`[^`]+`)/g)
+          const formattedLine = inlineParts.map((subPart, subIdx) => {
+            if (subPart.startsWith('`') && subPart.endsWith('`')) {
+              return (
+                <code key={subIdx} className={`px-1.5 py-0.5 rounded-md font-mono text-xs border ${
+                  isUser 
+                    ? 'bg-[#4338CA] text-white border-[#3730A3]' 
+                    : 'bg-[#EEF2FF] text-[#4F46E5] border-[#E2E8F0]'
+                }`}>
+                  {subPart.slice(1, -1)}
+                </code>
+              )
+            }
+
+            const boldParts = subPart.split(/(\*\*[^*]+\*\*)/g)
+            return boldParts.map((boldPart, boldIdx) => {
+              if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+                return (
+                  <strong key={boldIdx} className={`font-extrabold ${isUser ? 'text-white' : 'text-[#0F172A]'}`}>
+                    {boldPart.slice(2, -2)}
+                  </strong>
+                )
+              }
+              return boldPart
+            })
+          })
+
+          if (isBullet) {
+            return (
+              <ul key={lineIdx} className={`list-disc pl-5 my-0.5 text-xs sm:text-sm space-y-0.5 ${isUser ? 'text-white' : 'text-[#0F172A]'}`}>
+                <li className="leading-relaxed">{formattedLine}</li>
+              </ul>
+            )
+          }
+
+          if (isNumbered) {
+            const numMatch = line.match(/^(\d+)\.\s/)
+            const num = numMatch ? numMatch[1] : '1'
+            return (
+              <ol key={lineIdx} className={`list-decimal pl-5 my-0.5 text-xs sm:text-sm space-y-0.5 ${isUser ? 'text-white' : 'text-[#0F172A]'}`} start={parseInt(num)}>
+                <li className="leading-relaxed">{formattedLine}</li>
+              </ol>
+            )
+          }
+
+          return (
+            <p key={lineIdx} className={`leading-relaxed text-xs sm:text-sm ${isUser ? 'text-white' : 'text-[#0F172A]'}`}>
+              {formattedLine}
+            </p>
+          )
+        })}
+      </div>
+    )
+  })
+}
+
+const DEFAULT_GREETING = 'Сәлем! Мен DarynSpace AI ассистентімін. Мұғалімдер мен админдерге тапсырма құруға, жоба идеяларын ойлап табуға немесе оқушылардың үлгерімін талдауға көмектесемін. Не істей аламыз?'
+
 export default function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Сәлем! Мен DarynSpace AI ассистентімін. Мұғалімдер мен админдерге тапсырма құруға, жоба идеяларын ойлап табуға немесе оқушылардың үлгерімін талдауға көмектесемін. Не істей аламыз?'
-    }
-  ])
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [activeSessionId, setActiveSessionId] = useState<string>('')
+  const [showSessionList, setShowSessionList] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Load chat sessions from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('daryn_ai_sessions')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as ChatSession[]
+        if (parsed.length > 0) {
+          setSessions(parsed)
+          setActiveSessionId(parsed[0].id)
+          return
+        }
+      } catch (e) {
+        console.error('Failed to parse saved chat sessions:', e)
+      }
+    }
+
+    // Default first session
+    const defaultSession: ChatSession = {
+      id: 'default',
+      title: 'Жаңа диалог',
+      messages: [{ role: 'assistant', content: DEFAULT_GREETING }],
+      updatedAt: Date.now()
+    }
+    setSessions([defaultSession])
+    setActiveSessionId(defaultSession.id)
+  }, [])
+
+  // Save sessions to localStorage whenever they change
+  const saveSessions = (updatedSessions: ChatSession[]) => {
+    setSessions(updatedSessions)
+    localStorage.setItem('daryn_ai_sessions', JSON.stringify(updatedSessions))
+  }
+
+  const activeSession = sessions.find(s => s.id === activeSessionId)
+  const messages = activeSession ? activeSession.messages : []
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (isOpen) {
+      scrollToBottom()
+    }
+  }, [messages, isOpen, showSessionList])
+
+  const startNewChat = () => {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      title: 'Жаңа диалог',
+      messages: [{ role: 'assistant', content: DEFAULT_GREETING }],
+      updatedAt: Date.now()
+    }
+    const updated = [newSession, ...sessions]
+    saveSessions(updated)
+    setActiveSessionId(newSession.id)
+    setShowSessionList(false)
+  }
+
+  const deleteChat = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const filtered = sessions.filter(s => s.id !== id)
+    
+    if (filtered.length === 0) {
+      const defaultSession: ChatSession = {
+        id: 'default',
+        title: 'Жаңа диалог',
+        messages: [{ role: 'assistant', content: DEFAULT_GREETING }],
+        updatedAt: Date.now()
+      }
+      saveSessions([defaultSession])
+      setActiveSessionId(defaultSession.id)
+    } else {
+      saveSessions(filtered)
+      if (activeSessionId === id) {
+        setActiveSessionId(filtered[0].id)
+      }
+    }
+  }
 
   const handleSend = async (textToSend?: string) => {
     const messageContent = (textToSend || input).trim()
-    if (!messageContent || loading) return
+    if (!messageContent || loading || !activeSessionId) return
 
     if (!textToSend) {
       setInput('')
     }
 
-    const newMessages: Message[] = [...messages, { role: 'user', content: messageContent }]
-    setMessages(newMessages)
+    const updatedMessages: Message[] = [...messages, { role: 'user', content: messageContent }]
+    
+    // Update active session locally
+    let updatedSessions = sessions.map(s => {
+      if (s.id === activeSessionId) {
+        const isDefaultTitle = s.title === 'Жаңа диалог'
+        return {
+          ...s,
+          title: isDefaultTitle ? (messageContent.length > 25 ? messageContent.substring(0, 25) + '...' : messageContent) : s.title,
+          messages: updatedMessages,
+          updatedAt: Date.now()
+        }
+      }
+      return s
+    })
+    saveSessions(updatedSessions)
     setLoading(true)
 
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages })
+        body: JSON.stringify({ messages: updatedMessages })
       })
 
       if (!response.ok) {
@@ -85,7 +273,7 @@ export default function AIAssistant() {
           throw new Error('ИИ кілті теңшелінбеген (Сайтты қайта жинау қажет болуы мүмкін)')
         }
 
-        const contents = prepareContents(newMessages)
+        const contents = prepareContents(updatedMessages)
         if (contents.length === 0) {
           throw new Error('Жіберілетін мәлімет табылмады')
         }
@@ -115,10 +303,33 @@ export default function AIAssistant() {
 
         const data = await clientResponse.json()
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        setMessages((prev) => [...prev, { role: 'assistant', content: aiText }])
+        
+        // Save reply
+        const finalSessions = sessions.map(s => {
+          if (s.id === activeSessionId) {
+            return {
+              ...s,
+              messages: [...updatedMessages, { role: 'assistant' as const, content: aiText }],
+              updatedAt: Date.now()
+            }
+          }
+          return s
+        })
+        saveSessions(finalSessions)
       } else {
         const data = await response.json()
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.response }])
+        
+        const finalSessions = sessions.map(s => {
+          if (s.id === activeSessionId) {
+            return {
+              ...s,
+              messages: [...updatedMessages, { role: 'assistant' as const, content: data.response }],
+              updatedAt: Date.now()
+            }
+          }
+          return s
+        })
+        saveSessions(finalSessions)
       }
     } catch (error: any) {
       try {
@@ -128,7 +339,7 @@ export default function AIAssistant() {
           throw new Error('ИИ кілті теңшелінбеген')
         }
 
-        const contents = prepareContents(newMessages)
+        const contents = prepareContents(updatedMessages)
         if (contents.length === 0) {
           throw new Error('Жіберілетін мәлімет табылмады')
         }
@@ -158,13 +369,31 @@ export default function AIAssistant() {
 
         const data = await backupResponse.json()
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        setMessages((prev) => [...prev, { role: 'assistant', content: aiText }])
+        
+        const finalSessions = sessions.map(s => {
+          if (s.id === activeSessionId) {
+            return {
+              ...s,
+              messages: [...updatedMessages, { role: 'assistant' as const, content: aiText }],
+              updatedAt: Date.now()
+            }
+          }
+          return s
+        })
+        saveSessions(finalSessions)
       } catch (innerError: any) {
         console.error('AI assistant component error:', error, innerError)
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: `Қате орын алды: ${innerError.message || error.message || 'Сервер жауап бермеді.'}` }
-        ])
+        const finalSessions = sessions.map(s => {
+          if (s.id === activeSessionId) {
+            return {
+              ...s,
+              messages: [...updatedMessages, { role: 'assistant' as const, content: `Қате орын алды: ${innerError.message || error.message || 'Сервер жауап бермеді.'}` }],
+              updatedAt: Date.now()
+            }
+          }
+          return s
+        })
+        saveSessions(finalSessions)
       }
     } finally {
       setLoading(false)
@@ -211,14 +440,37 @@ export default function AIAssistant() {
         {/* Header */}
         <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between bg-gradient-to-r from-[#EEF2FF] to-[#F5F3FF]">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-[#0F172A]">DarynSpace AI</h3>
-              <p className="text-[10px] text-[#4F46E5] font-medium">Көмекші белсенді</p>
+            {showSessionList ? (
+              <button
+                onClick={() => setShowSessionList(false)}
+                className="p-1 hover:bg-white/50 rounded-lg text-[#64748B] hover:text-[#0F172A] transition-colors"
+                title="Артқа қайту"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowSessionList(true)}
+                className="p-1 hover:bg-white/50 rounded-lg text-[#64748B] hover:text-[#0F172A] transition-colors flex items-center justify-center relative"
+                title="Диалогтар тарихы"
+              >
+                <History className="w-5 h-5" />
+              </button>
+            )}
+            
+            <div className="flex items-center gap-1.5 ml-1">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center text-white">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-[#0F172A]">DarynSpace AI</h3>
+                <p className="text-[10px] text-[#4F46E5] font-semibold">
+                  {showSessionList ? 'Диалогтар тарихы' : 'Көмекші белсенді'}
+                </p>
+              </div>
             </div>
           </div>
+          
           <button
             onClick={() => setIsOpen(false)}
             className="p-1.5 hover:bg-[#F1F5F9] rounded-lg text-[#64748B] hover:text-[#0F172A] transition-colors"
@@ -227,86 +479,138 @@ export default function AIAssistant() {
           </button>
         </div>
 
-        {/* Quick Actions */}
-        <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC] flex gap-2 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => handleQuickAction('task')}
-            className="shrink-0 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-[#4F46E5] hover:bg-[#EEF2FF] transition-colors"
-          >
-            📝 Тапсырма жасау
-          </button>
-          <button
-            onClick={() => handleQuickAction('project')}
-            className="shrink-0 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-[#7C3AED] hover:bg-[#F5F3FF] transition-colors"
-          >
-            💡 Жоба идеясы
-          </button>
-          <button
-            onClick={() => handleQuickAction('progress')}
-            className="shrink-0 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
-          >
-            📊 Прогресс талдау
-          </button>
-        </div>
-
-        {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-white to-[#F8FAFC]">
-          {messages.map((m, idx) => (
-            <div
-              key={idx}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  m.role === 'user'
-                    ? 'bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white rounded-tr-none shadow-md shadow-[#4F46E5]/15'
-                    : 'bg-white border border-[#E2E8F0] text-[#0F172A] rounded-tl-none shadow-sm'
-                }`}
+        {showSessionList ? (
+          /* Session List View */
+          <div className="flex-1 flex flex-col bg-[#F8FAFC]">
+            <div className="p-4">
+              <button
+                onClick={startNewChat}
+                className="w-full py-3 bg-white hover:bg-[#EEF2FF] text-[#4F46E5] border border-dashed border-[#4F46E5] rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
               >
-                <p className="whitespace-pre-wrap">{m.content}</p>
-              </div>
+                <Plus className="w-4 h-4" /> Жаңа диалог бастау
+              </button>
             </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-tl-none px-4 py-2.5 shadow-sm flex items-center gap-1.5">
-                <Loader2 className="w-4 h-4 animate-spin text-[#4F46E5]" />
-                <span className="text-xs text-[#64748B]">Жауап дайындалуда...</span>
-              </div>
+            
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2.5">
+              {sessions.map(s => {
+                const isActive = s.id === activeSessionId
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => {
+                      setActiveSessionId(s.id)
+                      setShowSessionList(false)
+                    }}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
+                      isActive 
+                        ? 'bg-[#EEF2FF] border-[#818CF8] shadow-sm' 
+                        : 'bg-white border-[#E2E8F0] hover:border-[#CBD5E1]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <MessageSquare className={`w-4 h-4 ${isActive ? 'text-[#4F46E5]' : 'text-[#94A3B8]'}`} />
+                      <div className="truncate text-sm font-medium text-[#0F172A]">
+                        {s.title}
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={(e) => deleteChat(s.id, e)}
+                      className="p-1.5 text-[#94A3B8] hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                      title="Диалогты өшіру"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        ) : (
+          /* Chat Conversation View */
+          <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-b from-white to-[#F8FAFC]">
+            {/* Quick Actions */}
+            <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC] flex gap-2 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => handleQuickAction('task')}
+                className="shrink-0 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold text-[#4F46E5] hover:bg-[#EEF2FF] transition-colors"
+              >
+                📝 Тапсырма жасау
+              </button>
+              <button
+                onClick={() => handleQuickAction('project')}
+                className="shrink-0 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold text-[#7C3AED] hover:bg-[#F5F3FF] transition-colors"
+              >
+                💡 Жоба идеясы
+              </button>
+              <button
+                onClick={() => handleQuickAction('progress')}
+                className="shrink-0 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
+              >
+                📊 Прогресс талдау
+              </button>
+            </div>
 
-        {/* Input Form */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            handleSend()
-          }}
-          className="p-4 border-t border-[#E2E8F0] bg-white flex gap-2 items-center"
-        >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+            {/* Chat Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.map((m, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${
+                      m.role === 'user'
+                        ? 'bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white rounded-tr-none shadow-md shadow-[#4F46E5]/15'
+                        : 'bg-white border border-[#E2E8F0] text-[#0F172A] rounded-tl-none'
+                    }`}
+                  >
+                    {parseMarkdown(m.content, m.role === 'user')}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-tl-none px-4 py-2.5 shadow-sm flex items-center gap-1.5">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#4F46E5]" />
+                    <span className="text-xs text-[#64748B]">Жауап дайындалуда...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Form */}
+            <form
+              onSubmit={(e) => {
                 e.preventDefault()
                 handleSend()
-              }
-            }}
-            placeholder="Сұрағыңызды жазыңыз..."
-            rows={1}
-            className="flex-1 px-4 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] resize-none max-h-24 min-h-[40px] text-[#0F172A]"
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="w-10 h-10 shrink-0 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl flex items-center justify-center disabled:opacity-50 transition-colors shadow-lg shadow-[#4F46E5]/10"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
+              }}
+              className="p-4 border-t border-[#E2E8F0] bg-white flex gap-2 items-center"
+            >
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                placeholder="Сұрағыңызды жазыңыз..."
+                rows={1}
+                className="flex-1 px-4 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] resize-none max-h-24 min-h-[40px] text-[#0F172A] placeholder:text-[#94A3B8]"
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="w-10 h-10 shrink-0 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl flex items-center justify-center disabled:opacity-50 transition-colors shadow-lg shadow-[#4F46E5]/10"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        )}
       </aside>
     </>
   )
