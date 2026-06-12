@@ -6,6 +6,7 @@ import { Plus, Loader2, CheckCircle, Sparkles } from 'lucide-react'
 import { updateUserXP } from '@/lib/xp-utils'
 import { notifyStudentsOfNewAssignment, notifyGraded } from '@/lib/notification-utils'
 import { calculateCreativeScore } from '@/lib/creative-score'
+import { checkPlagiarism } from '@/lib/plagiarism'
 
 export default function TeacherAssignmentsPage() {
   const { profile } = useAuth()
@@ -17,6 +18,12 @@ export default function TeacherAssignmentsPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<any[]>([])
   const [grading, setGrading] = useState<{ id: string; score: string; feedback: string } | null>(null)
+  const [plagiarismResults, setPlagiarismResults] = useState<Record<string, { maxSimilarity: number; matchedStudentName?: string }>>({})
+
+  const handleCheckPlagiarism = (subId: string, content: string) => {
+    const result = checkPlagiarism(subId, content, submissions)
+    setPlagiarismResults(prev => ({ ...prev, [subId]: result }))
+  }
 
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [aiInputs, setAiInputs] = useState({ subject: 'Математика', grade: '8', difficulty: 'Орташа', type: 'test', topic: '' })
@@ -316,7 +323,29 @@ export default function TeacherAssignmentsPage() {
                       <button onClick={() => setGrading({ id: s.id, score: '', feedback: '' })} className="text-xs text-[#4F46E5] font-medium hover:underline">Бағалау</button>
                     )}
                   </div>
-                  <p className="text-xs text-[#64748B]">{s.content}</p>
+                  <p className="text-xs text-[#64748B] bg-slate-50 p-2.5 rounded-xl border border-slate-100 my-1 font-mono whitespace-pre-wrap">{s.content}</p>
+                  
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      onClick={() => handleCheckPlagiarism(s.id, s.content)}
+                      className="text-[10px] font-bold text-slate-500 hover:text-[#4F46E5] bg-slate-100 hover:bg-[#EEF2FF] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      🔎 Плагиат тексеру
+                    </button>
+                    {plagiarismResults[s.id] !== undefined && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        plagiarismResults[s.id].maxSimilarity >= 70
+                          ? 'bg-red-50 text-red-600 border border-red-100'
+                          : plagiarismResults[s.id].maxSimilarity >= 30
+                          ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                          : 'bg-green-50 text-green-600 border border-green-100'
+                      }`}>
+                        Ұқсастық: {plagiarismResults[s.id].maxSimilarity}%
+                        {plagiarismResults[s.id].maxSimilarity > 0 && ` (${plagiarismResults[s.id].matchedStudentName})`}
+                      </span>
+                    )}
+                  </div>
+
                   {grading?.id === s.id && (
                     <div className="mt-3 space-y-2 border-t border-[#E2E8F0] pt-3">
                       <input type="number" placeholder="Балл" value={grading?.score || ''} onChange={e => setGrading(g => g ? { ...g, score: e.target.value } : g)} className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm" />

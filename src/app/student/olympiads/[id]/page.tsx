@@ -45,18 +45,30 @@ export default function OlympiadDetailPage() {
   const [timeLeft, setTimeLeft] = useState<string>('')
   const [isTimeUp, setIsTimeUp] = useState(false)
   const [timerColor, setTimerColor] = useState('text-green-600')
+  const [codeLanguage, setCodeLanguage] = useState('python')
 
   const handleRunCode = async (problemId: string) => {
     setRunning(true)
     try {
       const code = answers[problemId] || ''
+      const lang = codeLanguage
+      let filename = 'main.py'
+      let version = '3.10.0'
+      if (lang === 'cpp') {
+        filename = 'main.cpp'
+        version = '10.2.0'
+      } else if (lang === 'java') {
+        filename = 'Main.java'
+        version = '15.0.2'
+      }
+
       const res = await fetch('https://emkc.org/api/v2/piston/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language: 'python',
-          version: '3.10.0',
-          files: [{ name: 'main.py', content: code }]
+          language: lang === 'cpp' ? 'c++' : lang,
+          version: version,
+          files: [{ name: filename, content: code }]
         })
       })
       const data = await res.json()
@@ -144,13 +156,24 @@ export default function OlympiadDetailPage() {
       isCorrect = answer.trim().toLowerCase() === (problem.correct_answer || '').trim().toLowerCase()
       score = isCorrect ? problem.points : 0
     } else if (problem.type === 'code') {
+      const lang = codeLanguage
+      let filename = 'main.py'
+      let version = '3.10.0'
+      if (lang === 'cpp') {
+        filename = 'main.cpp'
+        version = '10.2.0'
+      } else if (lang === 'java') {
+        filename = 'Main.java'
+        version = '15.0.2'
+      }
+
       const res = await fetch('https://emkc.org/api/v2/piston/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language: 'python',
-          version: '3.10.0',
-          files: [{ name: 'main.py', content: answer }]
+          language: lang === 'cpp' ? 'c++' : lang,
+          version: version,
+          files: [{ name: filename, content: answer }]
         })
       })
       const respData = await res.json()
@@ -275,14 +298,32 @@ export default function OlympiadDetailPage() {
                     />
                   ) : current.type === 'code' ? (
                     <div className="mb-4">
-                      <p className="text-xs text-[#64748B] mb-2 font-medium">Код жазу (Python)</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-[#64748B] font-medium">Код жазу</p>
+                        <select
+                          value={codeLanguage}
+                          onChange={e => setCodeLanguage(e.target.value)}
+                          className="px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-medium text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+                          disabled={isTimeUp}
+                        >
+                          <option value="python">Python</option>
+                          <option value="cpp">C++ (GCC)</option>
+                          <option value="java">Java (OpenJDK)</option>
+                        </select>
+                      </div>
                       <textarea
-                      value={answers[current.id] || ''}
-                      onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
-                      className="w-full px-4 py-3 bg-[#1E293B] text-green-400 font-mono border border-[#0F172A] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] min-h-[250px]"
-                      placeholder="def solve():&#10;    # Кодыңызды осында жазыңыз&#10;    print('Hello World')&#10;&#10;solve()"
-                      disabled={isTimeUp}
-                    />
+                        value={answers[current.id] || ''}
+                        onChange={e => setAnswers(p => ({ ...p, [current.id]: e.target.value }))}
+                        className="w-full px-4 py-3 bg-[#1E293B] text-green-400 font-mono border border-[#0F172A] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] min-h-[250px]"
+                        placeholder={
+                          codeLanguage === 'python'
+                            ? "def solve():\n    # Кодыңызды осында жазыңыз\n    print('Hello World')\n\nsolve()"
+                            : codeLanguage === 'cpp'
+                            ? "#include <iostream>\nusing namespace std;\nint main() {\n    cout << \"Hello World\" << endl;\n    return 0;\n}"
+                            : "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello World\");\n    }\n}"
+                        }
+                        disabled={isTimeUp}
+                      />
                       {runResult && (
                         <div className="mt-3 p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-mono">
                           <div className="font-semibold text-[#64748B] mb-1">Орындау нәтижесі:</div>

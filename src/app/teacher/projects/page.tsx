@@ -6,6 +6,7 @@ import { Plus, Loader2, Link2, Sparkles } from 'lucide-react'
 import { updateUserXP } from '@/lib/xp-utils'
 import { notifyGraded } from '@/lib/notification-utils'
 import { calculateCreativeScore } from '@/lib/creative-score'
+import { checkPlagiarism } from '@/lib/plagiarism'
 
 export default function TeacherProjectsPage() {
   const { profile } = useAuth()
@@ -17,6 +18,12 @@ export default function TeacherProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<any[]>([])
   const [grading, setGrading] = useState<any>(null)
+  const [plagiarismResults, setPlagiarismResults] = useState<Record<string, { maxSimilarity: number; matchedStudentName?: string }>>({})
+
+  const handleCheckPlagiarism = (subId: string, description: string) => {
+    const result = checkPlagiarism(subId, description, submissions)
+    setPlagiarismResults(prev => ({ ...prev, [subId]: result }))
+  }
 
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
@@ -276,6 +283,28 @@ export default function TeacherProjectsPage() {
                     {s.link_url && <a href={s.link_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1"><Link2 className="w-3 h-3"/> Жоба сілтемесі</a>}
                     {s.file_url && <a href={s.file_url} target="_blank" rel="noreferrer" className="text-xs text-[#4F46E5] underline font-medium">📥 Жүктелген файл</a>}
                   </div>
+                  
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      onClick={() => handleCheckPlagiarism(s.id, s.description)}
+                      className="text-[10px] font-bold text-slate-500 hover:text-[#4F46E5] bg-slate-100 hover:bg-[#EEF2FF] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      🔎 Плагиат тексеру
+                    </button>
+                    {plagiarismResults[s.id] !== undefined && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        plagiarismResults[s.id].maxSimilarity >= 70
+                          ? 'bg-red-50 text-red-600 border border-red-100'
+                          : plagiarismResults[s.id].maxSimilarity >= 30
+                          ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                          : 'bg-green-50 text-green-600 border border-green-100'
+                      }`}>
+                        Ұқсастық: {plagiarismResults[s.id].maxSimilarity}%
+                        {plagiarismResults[s.id].maxSimilarity > 0 && ` (${plagiarismResults[s.id].matchedStudentName})`}
+                      </span>
+                    )}
+                  </div>
+
                   {grading?.id===s.id&&(
                     <div className="mt-3 border-t pt-3 space-y-2">
                       {crit.map((c:any)=>(
