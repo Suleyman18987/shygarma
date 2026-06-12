@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Мұғалімдерге тапсырма жасауға, жоба идеяларын ұсынуға, оқушылардың прогресін талдауға көмектесесің. Жауаптарыңды қазақ тілінде бер. Қысқа және нақты жауап бер.'
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -93,7 +93,7 @@ export default function AIAssistant() {
         const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Жауаптарыңды қазақ тілінде бер. Мұғалімдерге және оқушыларға олимпиада және жоба жұмыстары бойынша көмектес. Қысқа және нақты жауап бер.'
 
         const clientResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${clientApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${clientApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -136,7 +136,7 @@ export default function AIAssistant() {
         const systemInstruction = 'Сен DarynSpace білім беру платформасының AI-ассистентісің. Жауаптарыңды қазақ тілінде бер.'
 
         const backupResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${clientApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${clientApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

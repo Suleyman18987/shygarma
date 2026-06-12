@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 Егер типі 'test' болса, 'options' массивінде міндетті түрде бір дұрыс нұсқа болуы керек. Егер типі 'test' болмаса, 'options' массивін бос қалдырыңыз.`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
